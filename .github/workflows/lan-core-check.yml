@@ -1,0 +1,32 @@
+name: LAN core checks
+on:
+  push:
+    branches: [feature/lan-core-96d4b10]
+    paths:
+      - CppProject/Lan/**
+      - tools/lan-state-tests/**
+      - .github/workflows/lan-core-check.yml
+  pull_request:
+    paths:
+      - CppProject/Lan/**
+      - tools/lan-state-tests/**
+      - .github/workflows/lan-core-check.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authority:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install Qt build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qtbase5-dev cmake ninja-build g++
+      - name: Configure standalone authority tests
+        run: cmake -S tools/lan-state-tests -B build/lan-state-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug
+      - name: Compile authority and tests
+        run: cmake --build build/lan-state-tests --parallel 2
+      - name: Test permissions and transaction invariants
+        run: ctest --test-dir build/lan-state-tests --output-on-failure
