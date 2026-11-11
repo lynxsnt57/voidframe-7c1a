@@ -2,6 +2,19 @@
 
 function shader_high_light_spot_set()
 {
+	render_set_uniform_int("uGoboMode", render_gobo_mode)
+	render_set_uniform_vec2("uGoboOffset", render_gobo_offset[X], render_gobo_offset[Y])
+	render_set_uniform_vec2("uGoboRepeat", render_gobo_repeat[X], render_gobo_repeat[Y])
+	render_set_uniform_int("uGoboTiling", render_gobo_tiling)
+	render_set_uniform_int("uGoboInvert", render_gobo_invert)
+	render_set_uniform("uGoboRotation", render_gobo_rotation)
+	render_set_uniform("uGoboIntensity", render_gobo_intensity)
+	render_set_uniform("uGoboSoftness", render_gobo_softness)
+	render_set_uniform("uGoboFeather", render_gobo_feather)
+	render_set_uniform("uGoboGamma", render_gamma)
+	texture_set_stage(sampler_map[?"uLightGobo"], sprite_get_texture(render_gobo_sprite, 0))
+	gpu_set_texfilter_ext(sampler_map[?"uLightGobo"], true)
+	gpu_set_texrepeat_ext(sampler_map[?"uLightGobo"], render_gobo_tiling)
 	render_set_uniform("uEmissive", 0)
 	
 	render_set_uniform_int("uIsSky", 0)

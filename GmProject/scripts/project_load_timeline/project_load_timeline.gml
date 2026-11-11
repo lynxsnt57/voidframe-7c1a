@@ -37,6 +37,7 @@ function project_load_timeline(map)
 				video_clip_retain(video_path)
 		}
 		video_linked_audio = value_get_real(map[?"video_linked_audio"], video_linked_audio)
+		emitter_attached = value_get_real(map[?"emitter_attached"], emitter_attached)
 		
 		if (type = e_temp_type.BODYPART)
 			model_part_name = value_get_string(map[?"model_part_name"], model_part_name)

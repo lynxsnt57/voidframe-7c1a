@@ -3,6 +3,10 @@
 #include "Render/GraphicsApiHandler.hpp"
 #include "Render/Vertex.hpp"
 
+#if !DEBUG_MODE
+#include <d3dcompiler.h>
+#endif
+
 namespace CppProject
 {
     ID3D11InputLayout* Shader::d3dInputLayout[4] = { nullptr, nullptr, nullptr, nullptr };
@@ -150,15 +154,15 @@ namespace CppProject
         {
             // Texture2D function to sample using UvRect uniform
             if (code.contains("texture2D("))
-                code = "\n"
+                code = QString("\n"
                 "float4 _sampleUvRect(Texture2D tex, SamplerState s, float4 uvRect, bool repeat, float2 uv)\n"
                 "{\n"
                 "\tfloat2 lodUv = uvRect.xy + uv * uvRect.zw;\n"
-                "\tfloat2 derivX = ddx(lodUv);\n"
-                "\tfloat2 derivY = ddy(lodUv);\n"
                 "\tif (repeat) uv = mod(uv, float2(1.0, 1.0));\n"
-                "\tuv = uvRect.xy + uv * uvRect.zw;\n"
-                "\treturn tex.SampleGrad(s, uv, derivX, derivY);\n"
+                "\tuv = uvRect.xy + uv * uvRect.zw;\n") +
+                (name == "shader_high_volume" ?
+                    "\treturn tex.SampleLevel(s, uv, 0);\n" :
+                    "\tfloat2 derivX = ddx(lodUv);\n\tfloat2 derivY = ddy(lodUv);\n\treturn tex.SampleGrad(s, uv, derivX, derivY);\n") +
                 "}\n\n" + code;
 
             // Pro RegEx hacker way to replace M * expr with mul(M, expr), beats writing a GLSL parser
@@ -353,6 +357,55 @@ namespace CppProject
         fsCacheName = ":/Shaders/Compiled/" + name + ".fsh.d3d";
     #endif
 
+    #if !DEBUG_MODE
+        // The GOBO shaders must match their embedded source and uniform layout.
+        // Old bundled .d3d bytecode predates GOBO, so compile only these two
+        // shaders in memory in Release. Leave every other shader cache untouched.
+        const bool compileGobo = name == "shader_high_light_spot" || name == "shader_high_light_spot_EX" || name == "shader_high_volume";
+        if (compileGobo)
+        {
+            HMODULE compiler = LoadLibraryExW(L"d3dcompiler_47.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+            if (!compiler)
+            {
+                WARNING("GOBO shader: Windows D3D compiler d3dcompiler_47.dll not found in System32");
+                return;
+            }
+            auto compile = reinterpret_cast<decltype(&D3DCompile)>(GetProcAddress(compiler, "D3DCompile"));
+            if (!compile)
+            {
+                FreeLibrary(compiler);
+                WARNING("GOBO shader: D3DCompile was not found in d3dcompiler_47.dll");
+                return;
+            }
+            auto compileGoboCode = [&](const QString& code, bool isVertex, Heap<char>& dst)
+            {
+                ID3DBlob* data = nullptr;
+                ID3DBlob* errors = nullptr;
+                const std::string source = code.toStdString();
+                const char* target = isVertex ? "vs_4_0" : "ps_4_0";
+                const UINT flags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3;
+                HRESULT result = compile(source.data(), source.size(), nullptr, nullptr, nullptr, "main", target, flags, 0, &data, &errors);
+                if (FAILED(result) || !data)
+                {
+                    QString detail = errors ? QString::fromUtf8(static_cast<const char*>(errors->GetBufferPointer()), static_cast<int>(errors->GetBufferSize())) : QString("no compiler details");
+                    WARNING("GOBO shader " + name + (isVertex ? " vertex" : " fragment") + " compilation failed: " + detail);
+                    if (errors) errors->Release();
+                    if (data) data->Release();
+                    return false;
+                }
+                if (errors) errors->Release();
+                dst.Alloc(data->GetBufferSize());
+                memcpy(dst.data, data->GetBufferPointer(), data->GetBufferSize());
+                data->Release();
+                return true;
+            };
+            bool ok = compileGoboCode(vsCode, true, vsData) && compileGoboCode(fsCode, false, fsData);
+            FreeLibrary(compiler);
+            if (!ok) return;
+            DEBUG("Compiled GOBO shader from embedded source: " + name);
+        }
+        else
+    #endif
         if (!useCache || !QFile::exists(vsCacheName) || !QFile::exists(fsCacheName))
         {
         #if DEBUG_MODE

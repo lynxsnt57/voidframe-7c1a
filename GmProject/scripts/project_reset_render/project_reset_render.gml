@@ -5,6 +5,14 @@ function project_reset_render()
 	project_render_engine = false
 	project_render_samples = 24
 	project_render_distance = 15000
+	project_render_volume_enabled = true
+	project_render_volume_resolution = 1
+	project_render_volume_quality = 1
+	project_render_volume_jitter = 1
+	project_render_volume_shadow_samples = 1
+	project_render_volume_shadow_softness = 0
+	project_render_volume_near = 0
+	project_render_volume_far = 0
 	
 	project_render_legacy_rendering = false
 	

@@ -39,6 +39,13 @@ function tl_value_spawn()
 			value[v] = tl_value_default(v)
 	}
 	
+	if (type = e_tl_type.VOLUME)
+	{
+		value[e_value.SCA_X] = 8
+		value[e_value.SCA_Y] = 8
+		value[e_value.SCA_Z] = 8
+	}
+
 	// Disable SSAO on particles by default
 	if (type = e_tl_type.PARTICLE_SPAWNER)
 		ssao = false

@@ -30,7 +30,14 @@ function render_start()
 	render_glow = project_render_glow && (render_quality = e_view_mode.RENDER)
 	render_glow_falloff = project_render_glow && project_render_glow_falloff && (render_quality = e_view_mode.RENDER)
 	
-	render_depth_normals = (render_ssao || render_indirect || render_reflections || project_render_subsurface_samples >= 0)
+	render_volume_active = false
+	if (project_render_volume_enabled && render_pass = e_render_pass.COMBINED && render_quality = e_view_mode.RENDER)
+	{
+		with (obj_timeline)
+			if (type = e_tl_type.VOLUME && value_inherit[e_value.VISIBLE] && !hide && !hq_hiding)
+				render_volume_active = true
+	}
+	render_depth_normals = (render_ssao || render_indirect || render_reflections || project_render_subsurface_samples >= 0 || render_volume_active)
 	
 	// Use camera settings
 	if (render_camera != null)

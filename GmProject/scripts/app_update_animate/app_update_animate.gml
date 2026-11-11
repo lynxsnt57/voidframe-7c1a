@@ -4,6 +4,14 @@
 
 function app_update_animate(force = false)
 {
+	secondary_preview_tick()
+	if (sm_preview && (timeline_playing || window_state != "")) action_secondary_preview_stop()
+	if (sm_preview)
+	{
+		with (obj_timeline) if (value[e_value.SECONDARY_ENABLED]) update_matrix = true
+		render_samples = -1
+	}
+	if (!rb_capture && !rb_job && rb_session != 0) rb_session_guard()
 	// Go through timelines
 	var bgobject, updatevalues, cameraarr, spawnerarr;
 	updatevalues = ((timeline_marker_previous != timeline_marker) || force)
@@ -32,7 +40,7 @@ function app_update_animate(force = false)
 	with (obj_timeline)
 	{
 		//check if hided
-		if (app.setting_viewport_optimization && hide && parent != app && !selected && type != e_tl_type.CAMERA)
+		if (app.setting_viewport_optimization && !app.rb_capture && app.rb_session == 0 && !secondary_motion_active && !value[e_value.SECONDARY_ENABLED] && hide && parent != app && !selected && type != e_tl_type.CAMERA)
 			continue;
 		
 		// Update values
@@ -40,7 +48,7 @@ function app_update_animate(force = false)
 			tl_update_values(selected)
 			
 		//check if not updated or visible
-		if (app.setting_viewport_optimization && (!value_inherit[e_value.VISIBLE] || hide) && type != e_tl_type.CAMERA)
+		if (app.setting_viewport_optimization && !app.rb_capture && app.rb_session == 0 && !secondary_motion_active && !value[e_value.SECONDARY_ENABLED] && (!value_inherit[e_value.VISIBLE] || hide) && type != e_tl_type.CAMERA)
 			continue;
 		
 		tex_obj = value_inherit[e_value.TEXTURE_OBJ]
@@ -124,7 +132,15 @@ function app_update_animate(force = false)
 			modifier_step += (app.timeline_marker - app.timeline_marker_previous) * value[e_value.MODIFIER_SHAKE_SPEED] / 25
 	}
 	
-	if (updatevalues)
+	if (rb_session == 1 && !rb_capture)
+	{
+		rb_capture = true
+		tl_update_matrix()
+		rb_capture = false
+		rb_live_tick()
+		tl_update_matrix()
+	}
+	else if (updatevalues || sm_preview || rb_session == 2 || rb_capture)
 		tl_update_matrix()
 	
 	// Update paths

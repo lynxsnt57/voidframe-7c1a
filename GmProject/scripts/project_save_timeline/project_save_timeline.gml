@@ -28,6 +28,8 @@ function project_save_timeline()
 			json_save_var("video_start_frame", video_start_frame)
 		}
 		json_save_var_bool("video_linked_audio", video_linked_audio)
+		if (type = e_tl_type.POINT_LIGHT)
+			json_save_var_bool("emitter_attached", emitter_attached)
 		
 		if (type = e_temp_type.BODYPART)
 			json_save_var("model_part_name", json_string_encode(model_part_name))

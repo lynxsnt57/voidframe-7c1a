@@ -7,12 +7,21 @@ function bench_click(type)
 	if (type = -1)
 	{
 		bench_mods_selected = true
+		bench_mesh_selected = false
+		bench_settings_ani = 0
+		return 0
+	}
+
+	if (type = -2)
+	{
+		bench_mods_selected = false
+		bench_mesh_selected = true
 		bench_settings_ani = 0
 		return 0
 	}
 
 	// Double clicked, create asset
-	if (!bench_mods_selected && bench_settings.type = type && bench_show_ani_type = "")
+	if (!bench_mods_selected && !bench_mesh_selected && bench_settings.type = type && bench_show_ani_type = "")
 	{
 		action_bench_create()
 		bench_show_ani_type = "hide"
@@ -21,6 +30,7 @@ function bench_click(type)
 	}
 	
 	bench_mods_selected = false
+	bench_mesh_selected = false
 
 	with (bench_settings)
 	{

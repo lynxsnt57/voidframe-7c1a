@@ -134,7 +134,7 @@ function list_init_context_menu(name)
 			list_item_last.disabled = (context_menu_value = null || context_menu_value.part_of != null)
 			
 			list_item_add(text_get("contextmenutldelete"), null, text_control_name(keybinds[e_keybind.TIMELINE_DELETE].keybind), null, icons.DELETE, null, action_tl_remove)
-			list_item_last.disabled = (context_menu_value = null || context_menu_value.part_of != null)
+			list_item_last.disabled = (context_menu_value = null)
 			
 			list_item_add(text_get("contextmenutlexport"), null, "", null, icons.ASSET_EXPORT, null, object_save)
 			list_item_last.disabled = (context_menu_value = null || (!context_menu_value.selected && context_menu_value.part_of != null)) ? true : !timeline_settings

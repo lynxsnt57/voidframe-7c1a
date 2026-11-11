@@ -4,6 +4,79 @@
 
 function tl_value_clamp(vid, val)
 {
+ if (vid >= e_value.GRAPH_KEY_MASK && vid <= e_value.GRAPH_SCA_Z_LIMIT_MAX)
+ {
+  if (!is_real(val) || val != val || abs(val) > 1000000000) return tl_value_default(vid)
+  if (vid == e_value.GRAPH_KEY_MASK) return clamp(round(val), 0, 511)
+  if (vid == e_value.GRAPH_ONLY || vid == e_value.GRAPH_CHANNELS_USED) return clamp(round(val), 0, 1)
+  var field = (vid - e_value.GRAPH_POS_X_CYCLE) mod 14;
+  if (field == 0) return clamp(round(val), 0, 3)
+  if (field == 1 || field == 6 || field == 11) return clamp(round(val), 0, 1)
+  if (field == 2) return clamp(val, 0, 2)
+  if (field == 4) return clamp(val, 0.0001, 100)
+  if (field == 5) return clamp(round(val), -1000000, 1000000)
+  if (field == 7 || field == 8) return clamp(round(val), 0, 1000000)
+  if (field == 10) return clamp(val, 0.001, 1000000)
+  return clamp(val, -1000000, 1000000)
+ }
+
+	if (vid >= e_value.RB_ENABLED && vid <= e_value.RB_MASK)
+	{
+		if (vid == e_value.RB_PARENT) return val
+		if (!is_real(val) || val != val || abs(val) > 1000000) return tl_value_default(vid)
+		if (vid == e_value.RB_ENABLED) return val >= 0.5
+		if (vid == e_value.RB_MODE) return clamp(round(val), 0, 2)
+		if (vid == e_value.RB_SHAPE) return clamp(round(val), 0, 1)
+		if (vid == e_value.RB_JOINT) return clamp(round(val), 0, 3)
+		if (vid == e_value.RB_MASS) return clamp(val, 0.001, 1000000)
+		if (vid == e_value.RB_FRICTION) return clamp(val, 0, 2)
+		if (vid == e_value.RB_BOUNCE) return clamp(val, 0, 1)
+		if (vid == e_value.RB_LINEAR_DRAG || vid == e_value.RB_ANGULAR_DRAG) return clamp(val, 0, 10)
+		if (vid >= e_value.RB_SIZE_X && vid <= e_value.RB_SIZE_Z) return clamp(val, 0.01, 100000)
+		if (vid >= e_value.RB_LIMIT_X && vid <= e_value.RB_LIMIT_Z) return clamp(val, 0, 175)
+		if (vid == e_value.RB_LAYER) return clamp(round(val), 0, 7)
+		if (vid == e_value.RB_MASK) return clamp(round(val), 0, 255)
+		return clamp(val, -100000, 100000)
+	}
+	if (vid >= e_value.SECONDARY_MODE && vid <= e_value.SECONDARY_TRAVEL_Z)
+	{
+		if (!is_real(val) || val != val || abs(val) > 1000000) return tl_value_default(vid)
+		if (vid == e_value.SECONDARY_MODE) return clamp(round(val), 0, 1)
+		if (vid >= e_value.SECONDARY_TRAVEL_X) return clamp(val, 0.001, 100)
+		return clamp(val, 0.1, 4)
+	}
+	if (vid >= e_value.SECONDARY_ENABLED && vid <= e_value.SECONDARY_WIND_Z)
+	{
+		switch (vid)
+		{
+			case e_value.SECONDARY_ENABLED: return clamp(val, 0, 1)
+			case e_value.SECONDARY_BLEND: return clamp(val, 0, 1)
+			case e_value.SECONDARY_FREQUENCY: return clamp(val, 0.1, 12)
+			case e_value.SECONDARY_DAMPING: return clamp(val, 0, 3)
+			case e_value.SECONDARY_INERTIA: return clamp(val, 0, 2)
+			case e_value.SECONDARY_GRAVITY: return clamp(val, -1000, 1000)
+			case e_value.SECONDARY_LIMIT: return clamp(val, 0, 175)
+			case e_value.SECONDARY_ANCHOR_X: return clamp(val, -10000, 10000)
+			case e_value.SECONDARY_ANCHOR_Y: return clamp(val, -10000, 10000)
+			case e_value.SECONDARY_ANCHOR_Z: return clamp(val, -10000, 10000)
+			case e_value.SECONDARY_TIP_X: return clamp(val, -10000, 10000)
+			case e_value.SECONDARY_TIP_Y: return clamp(val, -10000, 10000)
+			case e_value.SECONDARY_TIP_Z: return clamp(val, -10000, 10000)
+			case e_value.SECONDARY_WIND_X: return clamp(val, -1000, 1000)
+			case e_value.SECONDARY_WIND_Y: return clamp(val, -1000, 1000)
+			case e_value.SECONDARY_WIND_Z: return clamp(val, -1000, 1000)
+		}
+	}
+
+	if (vid >= e_value.GRAPH_POS_X_MODE && vid <= e_value.GRAPH_SCA_Z_IN_Y)
+	{
+		var field = (vid - e_value.GRAPH_POS_X_MODE) mod 5;
+		if (!is_real(val) || val != val || abs(val) > 1000000000) return tl_value_default(vid)
+		if (field = 0) return clamp(round(val), 0, 5)
+		if (field = 1 || field = 3) return clamp(val, 0, 1)
+		return clamp(val, -1000000, 1000000)
+	}
+
 	if (app.setting_unlimited_values)
 	{
 		if (tl_value_is_string(vid) || tl_value_is_bool(vid) || tl_value_is_obj(vid))
@@ -18,6 +91,11 @@ function tl_value_clamp(vid, val)
 	
 	switch (vid)
 	{
+		case e_value.LIGHT_GOBO_INTENSITY:
+		case e_value.LIGHT_GOBO_SOFTNESS:
+		case e_value.LIGHT_GOBO_FEATHER: return clamp(val, 0, 1)
+		case e_value.LIGHT_GOBO_REPEAT_X:
+		case e_value.LIGHT_GOBO_REPEAT_Y: return max(val, 0)
 		case e_value.POS_X:
 		case e_value.POS_Y:
 		case e_value.POS_Z: return clamp(val, -app.project_render_distance, app.project_render_distance)

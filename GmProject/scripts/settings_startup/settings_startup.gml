@@ -159,6 +159,8 @@ function settings_startup()
 	setting_tool_select = false
 	setting_tool_move = true
 	setting_tool_rotate = true
+	setting_rotation_space = 0 // 0: original gimbal, 1: local, 2: global
+	view_rotation_drag_mode = 0
 	setting_tool_scale = false
 	setting_tool_bend = true
 	setting_tool_transform = false
@@ -170,6 +172,7 @@ function settings_startup()
 	setting_reduced_motion = false
 	setting_wind_enable = true
 	
+	setting_graph_options = graph_options_defaults()
 	settings_load()
 	languages_load()
 	interface_update_instant()

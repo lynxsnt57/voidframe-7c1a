@@ -77,6 +77,7 @@ function app_startup_keybinds()
 		CAM_FAST,
 		CAM_SLOW,
 		CAM_VIEW_TIMELINE,
+        ROTATION_SPACE,
 		
 		amount
 	}
@@ -123,6 +124,7 @@ function app_startup_keybinds()
 	keybind_register("toolselect", e_keybind.TOOL_SELECT, keybind_new("W"))
 	keybind_register("toolmove", e_keybind.TOOL_MOVE, keybind_new("G"))
 	keybind_register("toolrotate", e_keybind.TOOL_ROTATE, keybind_new("R"))
+	keybind_register("rotationspace", e_keybind.ROTATION_SPACE, keybind_new("Q"))
 	keybind_register("toolscale", e_keybind.TOOL_SCALE, keybind_new("S"))
 	keybind_register("toolbend", e_keybind.TOOL_BEND, keybind_new("B"))
 	keybind_register("tooltransform", e_keybind.TOOL_TRANSFORM, keybind_new("T"))

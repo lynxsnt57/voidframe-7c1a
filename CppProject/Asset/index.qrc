@@ -251,6 +251,8 @@
 		<file>Shaders/shader_high_subsurface.vsh</file>
 		<file>Shaders/shader_high_subsurface_scatter.fsh</file>
 		<file>Shaders/shader_high_subsurface_scatter.vsh</file>
+		<file>Shaders/shader_high_volume.fsh</file>
+		<file>Shaders/shader_high_volume.vsh</file>
 		<file>Shaders/shader_high_wolviza.fsh</file>
 		<file>Shaders/shader_high_wolviza.vsh</file>
 		<file>Shaders/shader_high_wolviza_gm.fsh</file>

@@ -104,6 +104,10 @@ function render_update_tl_resource()
 					model_part_shape_material_res[i] = (temp.model = null ? mc_res.material_format : e_material.FORMAT_NONE)
 				}
 				
+				// These generated material textures use SEUS channel encoding.
+				if (shape.type = "glb_mesh" && model_part_shape_tex_material[i] != null)
+					model_part_shape_material_res[i] = e_material.FORMAT_SEUS
+
 				// Normal
 				if (normalres != null) 
 				{

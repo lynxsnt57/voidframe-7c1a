@@ -36,6 +36,8 @@ function model_file_load_shape(map, res)
 	
 	with (new_obj(obj_model_shape))
 	{
+		// Imported coverage needs stochastic sampling in the deferred high renderer.
+		gltf_transparent = value_get_real(map[?"gltf_transparent"], false)
 		// Type
 		type = map[?"type"]
 		
@@ -317,6 +319,82 @@ function model_file_load_shape(map, res)
 				vbuffer_default = model_shape_generate_plane(vec3(0))
 			else
 				vbuffer_default = model_shape_generate_plane_vertex(vec3(0))
+		}
+		else if (type = "glb_mesh")
+		{
+			// Internal experimental geometry. It is owned by this shape.
+			mesh_filename = value_get_string(map[?"mesh_file"], "")
+			if (res = null || mesh_filename = "" || string_pos("..", mesh_filename) > 0 ||
+				string_pos(":", mesh_filename) > 0 || string_pos("\\", mesh_filename) > 0 ||
+				string_pos("/", mesh_filename) = 1 || filename_ext(mesh_filename) != ".ctmesh")
+			{
+				log("Invalid experimental mesh path")
+				return null
+			}
+			skin_filename = value_get_string(map[?"skin_file"], "")
+			skin_joints = []
+			skin_path = ""
+			if (skin_filename != "")
+			{
+				var joint_list = map[?"skin_joints"]
+				if (!ds_list_valid(joint_list) || ds_list_size(joint_list) < 1 || ds_list_size(joint_list) > 256 ||
+					string_pos("..", skin_filename) > 0 || string_pos(":", skin_filename) > 0 ||
+					string_pos("\\", skin_filename) > 0 || string_pos("/", skin_filename) = 1 || filename_ext(skin_filename) != ".ctskin")
+				{
+					log("Invalid experimental skin")
+					return null
+				}
+				for (var ji = 0; ji < ds_list_size(joint_list); ji++)
+					array_add(skin_joints, value_get_string(joint_list[|ji], ""))
+				skin_path = load_folder + "/" + skin_filename
+				if (!file_exists_lib(skin_path)) { log("Missing experimental skin", skin_path) return null }
+			}
+			var mesh_path = load_folder + "/" + mesh_filename
+			skin_mesh_path = mesh_path
+			if (!file_exists_lib(mesh_path))
+			{
+				log("Missing experimental mesh", mesh_path)
+				return null
+			}
+			var mb = buffer_load_lib(mesh_path)
+			var sz = buffer_get_size(mb)
+			var valid = sz >= 12 && sz <= 32000012
+			var count = 0
+			if (valid)
+			{
+				valid = buffer_read(mb, buffer_u32) = 826823501
+				valid = (buffer_read(mb, buffer_u32) = 1) && valid
+				count = buffer_read(mb, buffer_u32)
+				valid = valid && count > 0 && count <= 1000000 && count mod 3 = 0 && sz = 12 + count * 32
+			}
+			if (!valid)
+			{
+				buffer_delete(mb)
+				log("Invalid experimental mesh", mesh_path)
+				return null
+			}
+			vertex_rgb = c_white
+			vertex_alpha = 1
+			vertex_wave = e_vertex_wave.NONE
+			vertex_emissive = 0
+			vertex_subsurface = 0
+			var vb = vbuffer_start()
+			for (var k = 0; k < count; k++)
+			{
+				var px = buffer_read(mb, buffer_f32)
+				var py = buffer_read(mb, buffer_f32)
+				var pz = buffer_read(mb, buffer_f32)
+				var nx = buffer_read(mb, buffer_f32)
+				var ny = buffer_read(mb, buffer_f32)
+				var nz = buffer_read(mb, buffer_f32)
+				var u = buffer_read(mb, buffer_f32)
+				var v = buffer_read(mb, buffer_f32)
+				vertex_add(px, py, pz, nx, ny, nz, u, v)
+			}
+			buffer_delete(mb)
+			vertex_end(vb)
+			vbuffer_default = vbuffer_generate_tangents(vb)
+			vertex_freeze(vbuffer_default)
 		}
 		else
 		{

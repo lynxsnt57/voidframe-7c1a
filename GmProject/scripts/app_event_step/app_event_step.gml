@@ -24,6 +24,7 @@ function app_event_step()
 	
 	if (window_get_current() = e_window.MAIN || (window_get_current() != e_window.MAIN && dev_mode && !is_cpp()))
 	{
+		if (rb_job) rb_job_tick()
 		textbox_input = keyboard_string
 		keyboard_string = ""
 		

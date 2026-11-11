@@ -8,6 +8,13 @@ function settings_save()
 	json_save_object_start()
 	json_save_var("format", settings_format)
 	
+	graph_options_capture()
+	// Graph settings are application preferences, never animation/project values.
+	json_save_object_start("graph_editor")
+	var graphkeys = graph_option_keys();
+	for (var gi = 0; gi < array_length(graphkeys); gi++)
+		json_save_var(graphkeys[gi], setting_graph_options[gi])
+	json_save_object_done()
 	json_save_object_start("assets")
 		
 		json_save_var("version", setting_minecraft_assets_version)
@@ -106,6 +113,7 @@ function settings_save()
 		json_save_var_bool("timeline_frame_snap", setting_timeline_frame_snap)
 		json_save_var_bool("z_is_up", setting_z_is_up)
 		json_save_var_bool("separate_tool_modes", setting_separate_tool_modes)
+		json_save_var("rotation_space", setting_rotation_space)
 		json_save_var_bool("show_shortcuts_bar", setting_show_shortcuts_bar)
 		json_save_var_bool("gizmos_face_camera", setting_gizmos_face_camera)
 		json_save_var_bool("fade_gizmos", setting_fade_gizmos)

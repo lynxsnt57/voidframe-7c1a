@@ -116,6 +116,9 @@ function render_high_shadows()
 		}
 		surface_reset_target()
 		
+		if (render_volume_active)
+			render_high_volume_draw(1, null, render_surface_volumetric, true)
+
 		// Add to shadows
 		surface_set_target(render_surface_shadows)
 		{
@@ -181,6 +184,7 @@ function render_high_shadows()
 					render_alpha_hash_force = true
 				
 					// Depth
+					app.render_emitter_shadow_owner = (emitter_attached && parent != app) ? parent : null
 					for (var d = e_dir.EAST; d < e_dir.amount; d++)
 					{
 						var look = dir_get_vec3(d);
@@ -212,6 +216,7 @@ function render_high_shadows()
 						}
 					}
 				
+					app.render_emitter_shadow_owner = null
 					taa_matrix = taa_jitter_matrix
 					render_alpha_hash = app.project_render_alpha_mode
 					render_alpha_hash_force = false
@@ -366,6 +371,15 @@ function render_high_shadows()
 			
 			#endregion
 			
+			if (render_volume_active)
+			{
+				var volume_light = id;
+				var volume_light_pass = type = e_tl_type.POINT_LIGHT ? 2 : 3;
+				var volume_light_shadows = shadows;
+				with (app)
+					render_high_volume_draw(volume_light_pass, volume_light, render_surface_volumetric, volume_light_shadows)
+			}
+
 			// Add diffuse/specular
 			gpu_set_blendmode(bm_add)
 			
@@ -388,6 +402,21 @@ function render_high_shadows()
 	
 	#endregion
 	
+	// Shadowless points are batched by the surface renderer; volumes need each one.
+	if (render_volume_active)
+	{
+		for (var vl = 0; vl < ds_list_size(render_shadowless_point_list); vl++)
+		{
+			var vol_light = render_shadowless_point_list[| vl];
+			if (!vol_light.hide && vol_light.value_inherit[e_value.VISIBLE] && !vol_light.hq_hiding)
+			{
+				render_world_start_light(vol_light.world_pos, point3D_add(vol_light.world_pos, vec3(1, 0, 0)), vec3(0, 0, 0), vol_light)
+				render_world_start()
+				render_world_done()
+				render_high_volume_draw(2, vol_light, render_surface_volumetric, false)
+			}
+		}
+	}
 	// Render shadowless point lights
 	render_high_shadows_shadowless()
 	

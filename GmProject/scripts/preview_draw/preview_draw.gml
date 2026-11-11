@@ -324,7 +324,7 @@ function preview_draw(preview, xx, yy, width, height)
 								if (select.model_format = e_model_format.BLOCK)
 								{
 									render_world_block(select.block_vbuffer, mc_res)
-									render_world_block_map(select.model_block_map, select)
+									render_world_block_map(select.model_block_map, select, select)
 								}
 								else if (select.model_file != null)
 								{
@@ -360,7 +360,7 @@ function preview_draw(preview, xx, yy, width, height)
 									
 									with (select)
 										res = temp_get_model_texobj(null)
-									render_world_block_map(select.model.model_block_map, res)
+									render_world_block_map(select.model.model_block_map, res, select.model)
 									break
 								}
 							}

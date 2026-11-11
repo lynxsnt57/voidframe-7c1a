@@ -13,7 +13,8 @@ function render_startup()
 			  render_light_color, render_light_strength, render_light_fade_size, render_light_spot_sharpness, render_shadow_matrix,
 			  render_sun_matrix, render_sun_direction, render_sun_near, render_sun_far, render_light_offset, render_shadow_from,
 			  render_spot_matrix, render_light_specular_strength, render_light_size, render_light_tl, render_light_shadow,
-			  render_light_shadow_blur;
+			  render_light_shadow_blur, render_gobo_sprite, render_gobo_mode, render_gobo_offset, render_gobo_repeat,
+			  render_gobo_tiling, render_gobo_invert, render_gobo_rotation, render_gobo_intensity, render_gobo_softness, render_gobo_feather;
 	
 	globalvar render_effects, render_effects_done, render_effects_list, render_effects_progress, render_camera_bloom, render_camera_dof,
 			  render_glow, render_glow_falloff, render_camera_ca, render_camera_distort, render_camera_color_correction, render_camera_grain,
@@ -41,6 +42,11 @@ function render_startup()
 	globalvar render_low_drawing, render_low_Before, render_shadow_blur_kernel, render_post_kernel, render_low_check_main,
 			  render_use_camera_depth;
 	
+	render_gobo_sprite = spr_shape
+	render_gobo_mode = 0
+	render_gobo_offset = vec2(0, 0)
+	render_gobo_repeat = vec2(1, 1)
+	app.render_emitter_shadow_owner = null
 	log("Render init")
 	
 	gpu_set_blendenable(true)
@@ -118,7 +124,7 @@ function render_startup()
 			  render_surface_diffuse, render_surface_material, render_surface_shadows, render_surface_specular, render_surface_lens, 
 			  render_surface_sample_expo, render_surface_sample_dec, render_surface_sample_alpha, depth_near, depth_far, depth_far_custom, render_post_index,
 			  render_surface_glow_cache, render_surface_glint, render_surface_scene_test, render_surface_alpha_fix,
-			  render_surface_volumetric;
+			  render_surface_volumetric, render_volume_active;
 			
 	render_target = null
 	render_surface[0] = null
@@ -139,6 +145,7 @@ function render_startup()
 	render_surface_scene_test = null
 	render_surface_alpha_fix = null
 	render_surface_volumetric = null
+	render_volume_active = false
 	
 	render_surface_shadows = null
 	render_surface_specular = null

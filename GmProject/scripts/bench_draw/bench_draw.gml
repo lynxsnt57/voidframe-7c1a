@@ -91,11 +91,11 @@ function bench_draw()
 		
 		if (!skipasset)
 		{
-			list_item_draw(bench_type_list.item[|i], dx, dy, 192, window_compact ? 28 : 32, (bench_type_list.item[|i].value = -1 ? bench_mods_selected : (!bench_mods_selected && bench_settings.type = bench_type_list.item[|i].value)), 0, 5)
+			list_item_draw(bench_type_list.item[|i], dx, dy, 192, window_compact ? 28 : 32, (bench_type_list.item[|i].value = -1 ? bench_mods_selected : (bench_type_list.item[|i].value = -2 ? bench_mesh_selected : (!bench_mods_selected && !bench_mesh_selected && bench_settings.type = bench_type_list.item[|i].value))), 0, 5)
 			dy += (window_compact ? 28 : 32)
 		}
 		
-		if (i = 2 || i = 6 || i = 9)
+		if (i = 3 || i = 7 || i = 10)
 		{
 			draw_divide(dx + 5, dy + 4, 184)
 			dy += 9

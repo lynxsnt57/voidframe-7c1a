@@ -47,6 +47,7 @@ namespace CppProject
 
 		IntType numIndices = 0;
 		QVector<Mesh<>*> meshes;
+		BoolType dynamicSkin = false; // Must never use a cached merged batch.
 		BoolType saveData = false; // Whether to discard data on CPU-side if it can't be used for batches
 
 		struct ThreadData

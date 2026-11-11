@@ -3,10 +3,16 @@
 
 function action_tl_play_start()
 {
+	if (sm_preview) action_secondary_preview_stop()
 	audio_stop_all()
 	
 	with (obj_timeline)
 	{
+		// Begin each playback/export with a clean physical state.
+		secondary_motion_release(id)
+		if (secondary_motion_active || value[e_value.SECONDARY_ENABLED])
+			update_matrix = true
+
 		if (type = e_tl_type.AUDIO && !hide && app.window_state != "export_movie")
 		{
 			for (var k = 0; k < ds_list_size(keyframe_list); k++)

@@ -18,6 +18,17 @@ uniform vec3 uShadowPosition; // static
 uniform float uLightSpecular;
 uniform bool uIgnore;
 
+uniform sampler2D uLightGobo; // static
+uniform int uGoboMode;
+uniform vec2 uGoboOffset;
+uniform vec2 uGoboRepeat;
+uniform int uGoboTiling;
+uniform int uGoboInvert;
+uniform float uGoboRotation;
+uniform float uGoboIntensity;
+uniform float uGoboSoftness;
+uniform float uGoboFeather;
+uniform float uGoboGamma;
 uniform sampler2D uDepthBuffer; // static
 
 uniform sampler2D uTextureMaterial; // static
@@ -273,6 +284,47 @@ void main()
 		}
 	}
 	
+    if (uIsSky == 0 && uGoboMode != 0) {
+        vec3 gobo = vec3(0.0);
+        if (uGoboMode == 1 && vScreenCoord.w > 0.0) {
+            // Scale and rotate around the centre of the cone, not the top-left corner.
+            vec2 uv = (vec2(vScreenCoord.x, -vScreenCoord.y) / vScreenCoord.z) * 0.5 * uGoboRepeat;
+            float co = cos(uGoboRotation), si = sin(uGoboRotation);
+            uv = vec2(co * uv.x - si * uv.y, si * uv.x + co * uv.y) + vec2(0.5) + uGoboOffset * 0.5 * uGoboRepeat;
+            float edge = 1.0;
+            if (uGoboTiling == 0) {
+                float d = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+                edge = step(0.0, d);
+                if (uGoboFeather > 0.0) edge *= smoothstep(0.0, max(0.0001, uGoboFeather * 0.5), d);
+                uv = clamp(uv, 0.0, 1.0);
+            }
+            float blur = uGoboSoftness * 0.025;
+            vec4 sample0 = texture2D(uLightGobo, uv) * 0.4;
+            if (blur > 0.0) {
+                vec2 xp = uv + vec2(blur, 0.0);
+                vec2 xm = uv - vec2(blur, 0.0);
+                vec2 yp = uv + vec2(0.0, blur);
+                vec2 ym = uv - vec2(0.0, blur);
+                if (uGoboTiling == 0) {
+                    xp = clamp(xp, vec2(0.001), vec2(0.999));
+                    xm = clamp(xm, vec2(0.001), vec2(0.999));
+                    yp = clamp(yp, vec2(0.001), vec2(0.999));
+                    ym = clamp(ym, vec2(0.001), vec2(0.999));
+                }
+                sample0 += texture2D(uLightGobo, xp) * 0.15;
+                sample0 += texture2D(uLightGobo, xm) * 0.15;
+                sample0 += texture2D(uLightGobo, yp) * 0.15;
+                sample0 += texture2D(uLightGobo, ym) * 0.15;
+            } else sample0 *= 2.5;
+            vec3 rgb = sample0.rgb;
+            if (uGoboInvert != 0) rgb = vec3(1.0) - rgb;
+            // Image colours are encoded like the base texture; lighting is linear.
+            gobo = pow(max(rgb, vec3(0.0)), vec3(max(uGoboGamma, 0.01))) * sample0.a * edge;
+        }
+        gobo = mix(vec3(1.0), gobo, clamp(uGoboIntensity, 0.0, 1.0));
+        light *= gobo;
+        spec *= gobo;
+    }
 	gl_FragData[0] = vec4(light, baseColor.a);
 	gl_FragData[1] = vec4(spec, baseColor.a);
 	

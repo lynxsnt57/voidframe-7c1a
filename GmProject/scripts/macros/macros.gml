@@ -28,7 +28,7 @@ function macros()
 	#macro gm_runtime					GM_runtime_version
 	 
 	// File formats
-	#macro project_format				e_project.FORMAT_CTB_106
+	#macro project_format				e_project.FORMAT_RIGID_V1
 	#macro settings_format				e_settings.FORMAT_200
 	#macro minecraft_assets_format		e_minecraft_assets.FORMAT_201
 	

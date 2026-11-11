@@ -88,9 +88,11 @@ function app_update_keyboard()
 		if (keybinds[e_keybind.CREATE_FOLDER].pressed)
 			action_tl_folder()
 		
+		var graphkeys = graph_keyboard_target();
 		if (keybinds[e_keybind.TIMELINE_SELECT].pressed) 
 		{
-			if (tl_edit)
+			if (graphkeys) graph_select_all_points(graph_target)
+			else if (tl_edit)
 				action_tl_deselect_all()
 			else
 				action_tl_select_all()
@@ -105,27 +107,47 @@ function app_update_keyboard()
 		if (keybinds[e_keybind.SECONDARY_VIEW].pressed) 
 			action_setting_secondary_view()
 		
-		if (keybinds[e_keybind.TIMELINE_DUPLICATE].pressed && tl_edit != null)
-			action_tl_duplicate()
+		if (keybinds[e_keybind.TIMELINE_DUPLICATE].pressed)
+		{
+			if (graphkeys) graph_duplicate_selection()
+			else if (tl_edit != null) action_tl_duplicate()
+		}
 		
-		if (keybinds[e_keybind.TIMELINE_DELETE].pressed && tl_edit != null)
+		if (!graphkeys && keybinds[e_keybind.TIMELINE_DELETE].pressed && tl_edit != null)
 			action_tl_remove()
 		
 		if (keybinds[e_keybind.KEYFRAMES_CREATE].pressed)
-			action_tl_keyframes_create()
+		{
+			if (graphkeys) graph_add_key()
+			else action_tl_keyframes_create()
+		}
 		
 		if (keybinds[e_keybind.KEYFRAMES_COPY].pressed)
-			tl_keyframes_copy()
+		{
+			if (graphkeys) ga_copy()
+			else tl_keyframes_copy()
+		}
 		
 		if (keybinds[e_keybind.KEYFRAMES_CUT].pressed)
-			action_tl_keyframes_cut()
+		{
+			if (graphkeys) { ga_copy(); graph_remove_key() }
+			else action_tl_keyframes_cut()
+		}
 		
 		if (keybinds[e_keybind.KEYFRAMES_PASTE].pressed)
-			action_tl_keyframes_paste(timeline_mouse_pos)
+		{
+			if (graphkeys) ga_paste()
+			else action_tl_keyframes_paste(timeline_mouse_pos)
+		}
 		
 		if (keybinds[e_keybind.KEYFRAMES_DELETE].pressed)
-			action_tl_keyframes_remove()
+		{
+			if (graphkeys) graph_remove_key()
+			else action_tl_keyframes_remove()
+		}
 		
+		if (graphkeys) graph_view_save(graph_active_view)
+
 		if (keybinds[e_keybind.PARTICLES_SPAWN].pressed)
 			action_lib_pc_spawn()
 		
@@ -172,6 +194,12 @@ function app_update_keyboard()
 			}
 		}
 		
+		if (keybinds[e_keybind.ROTATION_SPACE].pressed)
+		{
+			setting_rotation_space = (setting_rotation_space + 1) mod 3
+			render_low_drawing = 0
+		}
+
 		if (keybinds[e_keybind.TOOL_SCALE].pressed)
 		{
 			render_low_drawing = 0

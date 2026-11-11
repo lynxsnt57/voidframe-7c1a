@@ -137,6 +137,15 @@ function render_world_model_part(part, res, texnamemap, shapevbuffermap, colorna
 			{
 				texobj = res_get_model_texture(shapetexname)
 				render_set_texture(texobj)
+				if (shape.type = "glb_mesh")
+				{
+					var meshmat = res_get_model_texture_material(shape.texture_material_name)
+					if (meshmat != null)
+					{
+						render_set_texture(meshmat, "Material")
+						render_set_uniform_int("uMaterialFormat", e_material.FORMAT_SEUS)
+					}
+				}
 			}
 		}
 		
@@ -320,11 +329,64 @@ function render_world_model_part(part, res, texnamemap, shapevbuffermap, colorna
 			rendermatrix = matrix_multiply(rotmat, rendermatrix)
 		}
 		
-		// Pick vertex buffer from map if available
+		// Smooth meshes own a dynamic buffer per timeline instance, never per shared model.
 		if (shapevbuffermap != null && !is_undefined(shapevbuffermap[?shape]))
-			vbuffer_render_matrix(shapevbuffermap[?shape], rendermatrix)
+		{
+			var skin_draw_buffer = shapevbuffermap[?shape]
+			if (tlobject != null && shape.type = "glb_mesh" && shape.skin_filename != "" && tlobject.part_of != null)
+			{
+				skin_draw_buffer = shape.vbuffer_default
+				var skin_matrices = []
+				var skin_ready = true
+				// Build a temporary lookup for this render, so rebuilding, deleting or
+				// duplicating timelines can never leave stale cached bone references.
+				var skin_lookup = ds_string_map_create()
+				var skin_parts = tlobject.part_of.part_list
+				if (skin_parts != null)
+				{
+					for (var p = 0; p < ds_list_size(skin_parts); p++)
+					{
+						var skin_part = skin_parts[|p]
+						ds_map_add(skin_lookup, skin_part.model_part_name, skin_part)
+					}
+				}
+				for (var j = 0; j < array_length(shape.skin_joints); j++)
+				{
+					var skin_bone = skin_lookup[?shape.skin_joints[j]]
+					if (is_undefined(skin_bone) || skin_bone = null) { skin_ready = false break }
+					array_add(skin_matrices, skin_bone.matrix)
+				}
+				ds_map_destroy(skin_lookup)
+				if (skin_ready)
+				{
+					var skin_previous = shapevbuffermap[?shape]
+					if (skin_previous = shape.vbuffer_default) skin_previous = 0
+					var skin_buffer = glb_smooth_update(shape.skin_mesh_path, shape.skin_path, skin_matrices, rendermatrix, skin_previous)
+					if (skin_buffer != 0)
+					{
+						shapevbuffermap[?shape] = skin_buffer
+						skin_draw_buffer = skin_buffer
+					}
+				}
+			}
+			// Keep high-quality coverage consistent across deferred data and lighting passes.
+			var mesh_hash_override = shape.type = "glb_mesh" && shape.gltf_transparent && !render_alpha_hash_force
+			if (mesh_hash_override)
+				render_set_uniform_int("uAlphaHash", 1)
+			vbuffer_render_matrix(skin_draw_buffer, rendermatrix)
+			if (mesh_hash_override)
+				render_set_uniform_int("uAlphaHash", render_alpha_hash)
+		}
 	}
 	
 	if (!tlobject)
+	{
 		matrix_set(matrix_world, mat)
+		// Do not leak an experimental material into the next preview.
+		if (part.shape_list != null && ds_list_size(part.shape_list) > 0 && part.shape_list[|0].type = "glb_mesh")
+		{
+			render_set_texture(spr_default_material, "Material")
+			render_set_uniform_int("uMaterialFormat", e_material.FORMAT_NONE)
+		}
+	}
 }

@@ -64,6 +64,21 @@ function view_control_rotate_axis(view, control, vid, color, mat, len)
 			view_control_pos = pos2D
 			view_control_matrix = mat
 			view_control_length = len
+            app.view_rotation_drag_mode = 0
+            if (control >= e_view_control.ROT_X && control <= e_view_control.ROT_Z &&
+                app.setting_rotation_space != 0 && app.tl_edit_amount = 1 && tl_edit.inherit_rotation &&
+                tl_edit.value[e_value.ROT_TARGET] = null && tl_edit.value[e_value.LOOK_AT_TARGET] = null &&
+                tl_edit.value[e_value.IK_TARGET] = null && !tl_edit.value[e_value.MODIFIER_SHAKE])
+            {
+                app.view_rotation_drag_mode = app.setting_rotation_space
+                app.view_rotation_start = vec3(tl_edit.value[e_value.ROT_X], tl_edit.value[e_value.ROT_Y], tl_edit.value[e_value.ROT_Z])
+                var parent_rotation = array_copy_1d(tl_edit.matrix_parent);
+                matrix_remove_scale(parent_rotation)
+                parent_rotation[MAT_X] = 0
+                parent_rotation[MAT_Y] = 0
+                parent_rotation[MAT_Z] = 0
+                app.view_rotation_parent = parent_rotation
+            }
 		}
 		
 		// Right click

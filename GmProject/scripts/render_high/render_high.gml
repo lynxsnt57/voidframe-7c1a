@@ -34,9 +34,14 @@ function render_high()
 		// Create render passes
 		render_high_passes()
 		
+		// Accumulate light while each shared shadow map is still current.
+		if (render_volume_active)
+			render_high_volume_begin()
 		// Shadows
 		if (render_shadows)
-			render_high_shadows();
+			render_high_shadows()
+		else if (render_volume_active)
+			render_high_volume_unshadowed()
 			
 		// Indirect lighting
 		if (render_indirect)
@@ -49,6 +54,15 @@ function render_high()
 		// Composite current effects, avoid render surf 0 going forward
 		var finalsurf;
 			finalsurf = render_high_scene()
+		if (render_volume_active)
+		{
+			render_high_volume_draw(0, null, finalsurf, false)
+			surface_set_target(finalsurf)
+			gpu_set_blendmode(bm_add)
+			draw_surface_ext(render_surface_volumetric, 0, 0, render_width / surface_get_width(render_surface_volumetric), render_height / surface_get_height(render_surface_volumetric), 0, c_white, 1)
+			gpu_set_blendmode(bm_normal)
+			surface_reset_target()
+		}
 		
 		if (background_godray)
 			render_high_godray(finalsurf)

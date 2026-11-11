@@ -71,7 +71,7 @@ function render_world_tl_obj()
 					
 					with (temp)
 						res = temp_get_model_texobj(other.value_inherit[e_value.TEXTURE_OBJ])
-					render_world_block_map(temp.model.model_block_map, res)
+					render_world_block_map(temp.model.model_block_map, res, temp.model)
 				}
 				break
 			}

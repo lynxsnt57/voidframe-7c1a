@@ -1,6 +1,7 @@
 #include "Generated/Scripts.hpp"
 #include "World/GZIP.hpp"
 #include "AppHandler.hpp"
+#include "Library/GltfMeshImport.hpp"
 
 #include <QBuffer>
 #include <QDialog>
@@ -11,9 +12,11 @@
 #include <QUuid>
 #include <QDialogButtonBox>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QTreeWidget>
+#include <QTabWidget>
 #include <QComboBox>
 #include <QCheckBox>
 #include <functional>
@@ -51,6 +54,26 @@
 
 namespace CppProject
 {
+	StringType import_glb_model(StringType filename)
+	{
+		return importStaticGlb((QString)filename);
+	}
+
+	StringType import_glb_model_select_mesh(StringType filename)
+	{
+		return importStaticGlb((QString)filename, -1);
+	}
+
+	StringType import_glb_model_rigid(StringType filename)
+	{
+		return importStaticGlb((QString)filename, -2);
+	}
+
+	StringType import_glb_model_smooth(StringType filename)
+	{
+		return importStaticGlb((QString)filename, -3);
+	}
+
 	RealType lib_open_url(StringType url)
 	{
 		if (!url.StartsWith("http"))
@@ -88,7 +111,7 @@ namespace CppProject
 		return result;
 	}
 
-	// Inspect Fabric or Forge metadata, never extract files or run code.
+	// Inspect Fabric, NeoForge or Forge metadata, never extract files or run code.
 	StringType mod_inspect_fabric(StringType path)
 	{
 		int err = 0;
@@ -103,7 +126,7 @@ namespace CppProject
 		const zip_int64_t count = zip_get_num_entries(archive, 0);
 		if (count < 0 || count > 100000)
 			return fail("Archive has an invalid or excessive number of entries.");
-		zip_int64_t metadataIndex = -1, forgeIndex = -1;
+		zip_int64_t metadataIndex = -1, forgeIndex = -1, neoForgeIndex = -1;
 		int blocks = 0, models = 0, textures = 0;
 		for (zip_uint64_t i = 0; i < static_cast<zip_uint64_t>(count); ++i)
 		{
@@ -118,14 +141,26 @@ namespace CppProject
 				if (forgeIndex >= 0) return fail("Duplicate Forge metadata entries.");
 				forgeIndex = static_cast<zip_int64_t>(i);
 			}
+			if (name == "META-INF/neoforge.mods.toml") {
+				if (neoForgeIndex >= 0) return fail("Duplicate NeoForge metadata entries.");
+				neoForgeIndex = static_cast<zip_int64_t>(i);
+			}
 			if (!name.startsWith("assets/") || name.endsWith('/')) continue;
 			if (name.contains("/blockstates/") && name.endsWith(".json")) ++blocks;
 			if (name.contains("/models/block/") && name.endsWith(".json")) ++models;
 			if (name.contains("/textures/") && name.endsWith(".png")) ++textures;
 		}
-		bool forge=metadataIndex<0 && forgeIndex>=0;
-		if (metadataIndex < 0 && forgeIndex < 0) return fail("No Fabric or Forge metadata found. Older Forge or NeoForge formats may not be supported.");
-		if(forge) metadataIndex=forgeIndex;
+		// Match the static model importer: Fabric takes precedence in multi-loader
+		// JARs, then the dedicated NeoForge metadata, then legacy Forge metadata.
+		QString tomlLoader;
+		if (metadataIndex < 0 && neoForgeIndex >= 0) {
+			metadataIndex = neoForgeIndex;
+			tomlLoader = "NeoForge";
+		} else if (metadataIndex < 0 && forgeIndex >= 0) {
+			metadataIndex = forgeIndex;
+			tomlLoader = "Forge";
+		}
+		if (metadataIndex < 0) return fail("No Fabric, NeoForge or Forge metadata found. Older formats may not be supported.");
 		zip_stat_t stat;
 		zip_stat_init(&stat);
 		if (zip_stat_index(archive, metadataIndex, 0, &stat) != 0 || !(stat.valid & ZIP_STAT_SIZE) || stat.size > 262144)
@@ -142,11 +177,11 @@ namespace CppProject
 		}
 		if (zip_fclose(file) != 0) return fail("Invalid or corrupt mod metadata.");
 		zip_close(archive);
-		if(forge) {
+		if (!tomlLoader.isEmpty()) {
 			QList<ForgeModInfo> mods=mod_forge_metadata(data);
-			if(mods.isEmpty() || mods.first().id.isEmpty()) return "Forge metadata present, but a simple mod ID could not be read.";
+			if(mods.isEmpty() || mods.first().id.isEmpty()) return tomlLoader + " metadata present, but a simple mod ID could not be read.";
 			const ForgeModInfo& mod=mods.first();
-			QString out="Loader: Forge\nName: "+(mod.name.isEmpty()?mod.id:mod.name)+"\nID: "+mod.id+"\nVersion: "+(mod.version.isEmpty()?QString("Unknown"):mod.version);
+			QString out="Loader: " + tomlLoader + "\nName: "+(mod.name.isEmpty()?mod.id:mod.name)+"\nID: "+mod.id+"\nVersion: "+(mod.version.isEmpty()?QString("Unknown"):mod.version);
 			if(mods.size()>1) out+=QString("\nMods in archive: %1 (showing the first)").arg(mods.size());
 			out+=QString("\nBlockstates: %1\nBlock model JSON files: %2\nTexture PNG files: %3").arg(blocks).arg(models).arg(textures);
 			return out+"\nInspection only. No assets imported.";
@@ -299,9 +334,39 @@ namespace CppProject
 		return outputPath;
 	}
 
-	// Lightweight orthographic thumbnail for the model picker; it is not the
-	// application renderer. The actual imported model uses Mine-imator's renderer.
-	static QImage mod_render_preview(const QString& modelFile)
+	// Drag changes the camera of the software preview; this is not the game renderer.
+	class ModPreviewLabel : public QLabel
+	{
+	public:
+		using QLabel::QLabel;
+		std::function<void(double, double)> onRotate;
+	protected:
+		void mousePressEvent(QMouseEvent* event) override
+		{
+			if (event->button() == Qt::LeftButton) { lastPos = event->pos(); dragging = true; event->accept(); return; }
+			QLabel::mousePressEvent(event);
+		}
+		void mouseMoveEvent(QMouseEvent* event) override
+		{
+			if (dragging && (event->buttons() & Qt::LeftButton)) {
+				QPoint delta = event->pos() - lastPos; lastPos = event->pos();
+				if (onRotate) onRotate(delta.x(), delta.y());
+				event->accept(); return;
+			}
+			QLabel::mouseMoveEvent(event);
+		}
+		void mouseReleaseEvent(QMouseEvent* event) override
+		{
+			if (event->button() == Qt::LeftButton) { dragging = false; event->accept(); return; }
+			QLabel::mouseReleaseEvent(event);
+		}
+	private:
+		QPoint lastPos;
+		bool dragging = false;
+	};
+
+	// Lightweight orthographic image; imported geometry uses Mine-imator's renderer.
+	static QImage mod_render_preview(const QString& modelFile, double yawDegrees, double elevationDegrees)
 	{
 		QFile file(modelFile);
 		if (!file.open(QIODevice::ReadOnly)) return QImage();
@@ -328,7 +393,7 @@ namespace CppProject
 		}
 		struct Face { QVector<QVector3D> points; QPolygonF uv; QImage image; double depth; };
 		QVector<Face> faces;
-		const double yaw = 40.0 * 3.141592653589793 / 180.0, elevation = 25.0 * 3.141592653589793 / 180.0;
+		const double yaw = yawDegrees * 3.141592653589793 / 180.0, elevation = elevationDegrees * 3.141592653589793 / 180.0;
 		const QVector3D right(std::cos(yaw), 0, -std::sin(yaw));
 		const QVector3D view(std::sin(yaw)*std::cos(elevation), std::sin(elevation), std::cos(yaw)*std::cos(elevation));
 		const QVector3D up = QVector3D::crossProduct(view, right);
@@ -347,7 +412,6 @@ namespace CppProject
 			geometry["west"]  = {{x,Y,z},{x,Y,Z},{x,y,Z},{x,y,z}};
 			geometry["up"]    = {{x,Y,z},{X,Y,z},{X,Y,Z},{x,Y,Z}};
 			geometry["down"]  = {{x,y,Z},{X,y,Z},{X,y,z},{x,y,z}};
-			QMap<QString, QVector3D> normals = {{"north",{0,0,-1}},{"south",{0,0,1}},{"east",{1,0,0}},{"west",{-1,0,0}},{"up",{0,1,0}},{"down",{0,-1,0}}};
 			QJsonObject rotation = e.value("rotation").toObject();
 			QString axis = rotation.value("axis").toString();
 			double angle = rotation.value("angle").toDouble() * 3.141592653589793 / 180.0;
@@ -363,20 +427,33 @@ namespace CppProject
 			for (auto it = namedFaces.begin(); it != namedFaces.end(); ++it) {
 				QString name = it.key();
 				if (!geometry.contains(name)) continue;
-				QVector3D normal = rotate(normals.value(name));
+				// Derive winding from the actual corners. Some models deliberately
+				// reverse from/to axes to make back faces (for example ladders).
+				QVector<QVector3D> points = geometry.value(name);
+				QVector3D normal = -QVector3D::crossProduct(points[1]-points[0], points[2]-points[0]);
+				if (normal.lengthSquared() < 0.00000001f) continue;
+				normal = rotate(normal.normalized());
 				if (QVector3D::dotProduct(normal, view) <= 0.0001) continue;
 				QJsonObject f = it.value().toObject();
 				QString ref = f.value("texture").toString();
 				if (!ref.startsWith('#') || !tex.contains(ref.mid(1))) return QImage();
 				QImage image = tex.value(ref.mid(1));
 				QJsonArray uv = f.value("uv").toArray();
-				if (uv.size() != 4) return QImage(); // Don't guess implicit UV in the thumbnail.
+				if (uv.isEmpty()) {
+					// Minecraft's default face UVs, in the source model coordinate system.
+					if (name == "north") uv = QJsonArray{16-X,16-Y,16-x,16-y};
+					else if (name == "south") uv = QJsonArray{x,16-Y,X,16-y};
+					else if (name == "west") uv = QJsonArray{z,16-Y,Z,16-y};
+					else if (name == "east") uv = QJsonArray{16-Z,16-Y,16-z,16-y};
+					else if (name == "up") uv = QJsonArray{x,z,X,Z};
+					else uv = QJsonArray{x,16-Z,X,16-z};
+				}
+				if (uv.size() != 4) return QImage();
 				double u=uv[0].toDouble()*image.width()/16., w=uv[2].toDouble()*image.width()/16.;
 				double v0=uv[1].toDouble()*image.height()/16., v1=uv[3].toDouble()*image.height()/16.;
 				QPolygonF source; source << QPointF(u,v0) << QPointF(w,v0) << QPointF(w,v1) << QPointF(u,v1);
 				int turns = int(f.value("rotation").toDouble()) / 90;
 				for (int i = 0; i < turns; ++i) source.prepend(source.takeLast());
-				QVector<QVector3D> points = geometry.value(name);
 				double depth = 0;
 				for (QVector3D& p : points) {
 					p -= origin;
@@ -420,6 +497,66 @@ namespace CppProject
 		}
 		painter.end();
 		return drawnFaces ? result : QImage();
+	}
+
+	struct ModObjTriangle
+	{
+		QVector3D a, b, c;
+		QPointF ta, tb, tc;
+		QImage texture;
+	};
+	struct ModObjScene { QVector<ModObjTriangle> triangles; };
+
+	// Approximate OBJ thumbnail: opaque-depth sorting and flat, unlit textured faces.
+	// No OBJ geometry is passed to the Mine-imator importer.
+	static QImage mod_render_obj_preview(const ModObjScene& scene, double yawDegrees, double elevationDegrees)
+	{
+		const double yaw = yawDegrees * 3.141592653589793 / 180.0, elevation = elevationDegrees * 3.141592653589793 / 180.0;
+		const QVector3D right(std::cos(yaw), 0, -std::sin(yaw));
+		const QVector3D view(std::sin(yaw)*std::cos(elevation), std::sin(elevation), std::cos(yaw)*std::cos(elevation));
+		const QVector3D up = QVector3D::crossProduct(view, right);
+		struct Face { const ModObjTriangle* triangle; double depth; };
+		QVector<Face> visible;
+		double minX=1e30,maxX=-1e30,minY=1e30,maxY=-1e30;
+		for (const ModObjTriangle& tri : scene.triangles) {
+			const QVector3D normal = QVector3D::crossProduct(tri.b-tri.a, tri.c-tri.a);
+			if (QVector3D::dotProduct(normal, view) <= 0.000001) continue;
+			double depth = (QVector3D::dotProduct(tri.a,view)+QVector3D::dotProduct(tri.b,view)+QVector3D::dotProduct(tri.c,view))/3.0;
+			visible.append({&tri, depth});
+			for (const QVector3D& p : {tri.a, tri.b, tri.c}) {
+				double x=QVector3D::dotProduct(p,right), y=QVector3D::dotProduct(p,up);
+				minX=std::min(minX,x); maxX=std::max(maxX,x); minY=std::min(minY,y); maxY=std::max(maxY,y);
+			}
+		}
+		if (visible.isEmpty() || maxX-minX < .000001 || maxY-minY < .000001) return QImage();
+		std::sort(visible.begin(), visible.end(), [](const Face& a, const Face& b){ return a.depth < b.depth; });
+		const double scale=std::min(310.0/(maxX-minX),280.0/(maxY-minY));
+		QImage result(400,360,QImage::Format_ARGB32_Premultiplied); result.fill(QColor("#20242b"));
+		QPainter painter(&result); painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+		int drawn=0;
+		for (const Face& face : visible) {
+			const ModObjTriangle& t=*face.triangle;
+			QPolygonF source, target;
+			for (const QPointF& uv : {t.ta,t.tb,t.tc}) source << QPointF(uv.x()*t.texture.width(),uv.y()*t.texture.height());
+			for (const QVector3D& p : {t.a,t.b,t.c}) {
+				double x=QVector3D::dotProduct(p,right), y=QVector3D::dotProduct(p,up);
+				target << QPointF(200+(x-(minX+maxX)/2)*scale,180-(y-(minY+maxY)/2)*scale);
+			}
+			QPainterPath clip; clip.addPolygon(target); clip.closeSubpath();
+			source << source[0] + source[2] - source[1];
+			target << target[0] + target[2] - target[1];
+			QTransform transform;
+			if (!QTransform::quadToQuad(source,target,transform)) {
+				// Some OBJ faces use a single texel or a line of UVs. An affine
+				// transform is singular; use the centre texel as an approximation.
+				QPointF middle=(t.ta+t.tb+t.tc)/3.0;
+				int x=std::max(0,std::min(t.texture.width()-1,int(middle.x()*t.texture.width())));
+				int y=std::max(0,std::min(t.texture.height()-1,int(middle.y()*t.texture.height())));
+				painter.fillPath(clip,t.texture.pixelColor(x,y)); ++drawn; continue;
+			}
+			painter.save(); painter.setClipPath(clip); painter.setWorldTransform(transform); painter.drawImage(QPointF(0,0),t.texture); painter.restore(); ++drawn;
+		}
+		painter.end(); return drawn ? result : QImage();
 	}
 
 	// Export a standalone Blockbench Java-block project with embedded PNG copies.
@@ -736,6 +873,7 @@ namespace CppProject
 	// Experimental static Minecraft block model importer. Reads data only, never mod code.
 	StringType mod_import_static_model(StringType jarPath, StringType minecraftZipPath)
 	{
+		DEBUG("MOD_PICKER: opening archive");
 		int zipError = 0;
 		std::string archiveName = jarPath.ToStdString();
 		std::unique_ptr<zip_t, decltype(&zip_discard)> archive(zip_open(archiveName.c_str(), ZIP_RDONLY, &zipError), zip_discard);
@@ -798,16 +936,29 @@ namespace CppProject
 			if (error.error != QJsonParseError::NoError || !doc.isObject()) return false;
 			out = doc.object(); return true;
 		};
+		auto readMinecraftJson = [&readMc](const QString& path, QJsonObject& out) -> bool {
+			QByteArray bytes;
+			if (!readMc(path, 1048576, bytes)) return false;
+			QJsonParseError error;
+			QJsonDocument doc = QJsonDocument::fromJson(bytes, &error);
+			if (error.error != QJsonParseError::NoError || !doc.isObject()) return false;
+			out = doc.object(); return true;
+		};
 		QJsonObject metadata;
+		bool isCobblemon = false;
 		if (entries.contains("fabric.mod.json")) {
 			if (!readJson("fabric.mod.json", metadata) || !metadata.value("id").isString()) return "ERROR: Valid Fabric metadata not found.";
-			if (metadata.value("id").toString() == "cobblemon") return mod_browse_cobblemon(entries, readEntry);
+			isCobblemon = metadata.value("id").toString() == "cobblemon";
 		} else {
-			QByteArray forgeData;
-			if (!readEntry("META-INF/mods.toml",262144,forgeData)) return "ERROR: Valid Fabric or Forge metadata not found.";
-			QList<ForgeModInfo> forgeMods=mod_forge_metadata(forgeData);
-			if (forgeMods.isEmpty() || forgeMods.first().id.isEmpty()) return "ERROR: Forge mod ID could not be read.";
-			for(const ForgeModInfo& mod:forgeMods) if(mod.id=="cobblemon") return mod_browse_cobblemon(entries, readEntry);
+			// Prefer dedicated NeoForge metadata if a multi-loader JAR contains both.
+			const bool neoForge = entries.contains("META-INF/neoforge.mods.toml");
+			const QString metadataPath = neoForge ? "META-INF/neoforge.mods.toml" : "META-INF/mods.toml";
+			const QString loader = neoForge ? "NeoForge" : "Forge";
+			QByteArray tomlData;
+			if (!readEntry(metadataPath,262144,tomlData)) return "ERROR: Valid Fabric, NeoForge or Forge metadata not found.";
+			QList<ForgeModInfo> mods=mod_forge_metadata(tomlData);
+			if (mods.isEmpty() || mods.first().id.isEmpty()) return "ERROR: " + loader + " mod ID could not be read.";
+			for (const ForgeModInfo& mod:mods) if (mod.id=="cobblemon") isCobblemon = true;
 		}
 		const QRegularExpression idPattern("^([a-z0-9_.-]+):([a-z0-9_./-]+)$");
 		auto resourcePath = [&idPattern](const QString& id, const QString& folder, const QString& suffix) -> QString {
@@ -820,20 +971,29 @@ namespace CppProject
 				if (segment.isEmpty() || segment == "." || segment == "..") return QString();
 			return "assets/" + match.captured(1) + "/" + folder + "/" + path + suffix;
 		};
-		QStringList models;
-		const QRegularExpression modelPattern("^assets/([a-z0-9_.-]+)/models/(block/[a-z0-9_./-]+)\\.json$");
+		QStringList models, entityModels, bedrockModels;
+		const QRegularExpression modelPattern("^assets/([a-z0-9_.-]+)/models/((?:block|item|entity)/[a-z0-9_./-]+)\\.json$");
+		const QRegularExpression bedrockPattern("^assets/[a-z0-9_.-]+/[a-z0-9_./-]+\\.geo\\.json$");
 		for (auto it = entries.cbegin(); it != entries.cend(); ++it) {
-			auto match = modelPattern.match(it.key());
+			const QString path=it.key();
+			if (bedrockPattern.match(path).hasMatch()) {
+				if (!path.contains("/../") && !path.contains("/./") && !path.contains("//")) bedrockModels.append(path);
+				continue;
+			}
+			auto match = modelPattern.match(path);
 			if (match.hasMatch()) {
 				QString id = match.captured(1) + ":" + match.captured(2);
-				if (!resourcePath(id, "models", ".json").isEmpty()) models.append(id);
+				if (resourcePath(id, "models", ".json").isEmpty()) continue;
+				if (match.captured(2).startsWith("entity/")) entityModels.append(id);
+				else models.append(id);
 			}
 		}
-		if (models.isEmpty()) return "ERROR: No block model JSON files found in this JAR.";
-		if (models.size() > 10000) return "ERROR: Too many models in this JAR.";
-		models.sort(Qt::CaseInsensitive);
-		auto prepare = [&resourcePath, &readJson, &readEntry, &entries, &readMc, &mcEntries](const QString& selected) -> StringType {
+		if (models.size()+entityModels.size()+bedrockModels.size() > 10000) return "ERROR: Too many models in this JAR.";
+		models.sort(Qt::CaseInsensitive); entityModels.sort(Qt::CaseInsensitive); bedrockModels.sort(Qt::CaseInsensitive);
+		DEBUG("MOD_PICKER: indexed model lists");
+		auto prepare = [&resourcePath, &readJson, &readMinecraftJson, &readEntry, &entries, &readMc, &mcEntries](const QString& selected, bool previewOnly) -> StringType {
 			QString current = selected;
+			bool generatedItem = false;
 			QSet<QString> visited;
 			QList<QJsonObject> layers;
 			for (int depth = 0; ; ++depth) {
@@ -841,7 +1001,24 @@ namespace CppProject
 				visited.insert(current);
 				QString path = resourcePath(current, "models", ".json");
 				QJsonObject layer;
-				if (path.isEmpty() || !readJson(path, layer)) return "ERROR: Model parent missing from JAR or invalid (Minecraft/dependency assets are not supported yet).";
+				QString fullCurrent = current.contains(':') ? current : "minecraft:" + current;
+				if (fullCurrent == "minecraft:item/generated" || fullCurrent == "minecraft:item/handheld") {
+					generatedItem = true;
+					break;
+				}
+				if (path.isEmpty()) return "ERROR: Invalid model parent identifier: " + current;
+				if (entries.contains(path)) {
+					if (!readJson(path, layer)) return "ERROR: Invalid or unreadable mod model: " + current;
+				} else if (path.startsWith("assets/minecraft/") && mcEntries.contains(path)) {
+					if (!readMinecraftJson(path, layer)) return "ERROR: Invalid or unreadable Minecraft model: " + current;
+				} else if (path == "assets/minecraft/models/block/block.json") {
+					// Vanilla 1.21.1 block/block is a geometry-free root. Its display
+					// transforms are irrelevant to this static block importer. Some
+					// asset archives omit this root, so an empty base is sufficient.
+					layer = QJsonObject();
+				} else {
+					return "ERROR: Model parent missing: " + current + " (check the selected Minecraft assets; dependency JARs are not supported).";
+				}
 				// Framework open_model stores static cuboids in "components".
 				// Other loaders may implement arbitrary semantics and are not executed.
 				if (layer.contains("loader") || layer.contains("fabric:type")) {
@@ -869,6 +1046,24 @@ namespace CppProject
 				for (auto p = obj.begin(); p != obj.end(); ++p)
 					if (p.key() != "parent" && p.key() != "textures") merged.insert(p.key(), p.value());
 			}
+			if (generatedItem && !merged.value("elements").isArray()) {
+				if (!previewOnly) return "ERROR: Generated flat items are available for preview only; import is not supported.";
+				// A two-sided flat approximation, not Minecraft's extruded sprite mesh.
+				QJsonArray planes;
+				for (int i = 0; i < 5; ++i) {
+					QString key = "layer" + QString::number(i);
+					if (!textureRefs.contains(key)) break;
+					double offset = i * 0.001;
+					QJsonObject front, back, faceMap, plane;
+					front.insert("texture", "#" + key); front.insert("uv", QJsonArray{0,0,16,16});
+					back.insert("texture", "#" + key); back.insert("uv", QJsonArray{16,0,0,16});
+					faceMap.insert("south", front); faceMap.insert("north", back);
+					plane.insert("from", QJsonArray{0,0,8-offset});
+					plane.insert("to", QJsonArray{16,16,8+offset});
+					plane.insert("faces", faceMap); planes.append(plane);
+				}
+				merged.insert("elements", planes);
+			}
 			if (!merged.value("elements").isArray()) return "ERROR: This model has no static geometry.";
 			QJsonArray elements = merged.value("elements").toArray();
 			if (elements.isEmpty() || elements.size() > 1024) return "ERROR: Empty or excessively complex geometry.";
@@ -879,6 +1074,7 @@ namespace CppProject
 				return true;
 			};
 			QSet<QString> needed, tinted, plain;
+			bool hasUnshadedElements = false;
 			for (const QJsonValue& value : elements) {
 				if (!value.isObject()) return "ERROR: Invalid geometry element.";
 				QJsonObject element = value.toObject();
@@ -897,7 +1093,10 @@ namespace CppProject
 					if (rotation.contains("origin") && !numbers(rotation.value("origin"), 3)) return "ERROR: Invalid rotation origin.";
 					if (rotation.contains("rescale") && !rotation.value("rescale").isBool()) return "ERROR: Invalid rotation rescale flag.";
 				}
-				if (element.contains("shade") && element.value("shade").isBool() && !element.value("shade").toBool()) return "ERROR: Unshaded elements are not supported yet.";
+				if (element.contains("shade")) {
+					if (!element.value("shade").isBool()) return "ERROR: Invalid shade flag.";
+					if (!element.value("shade").toBool()) hasUnshadedElements = true;
+				}
 				QJsonObject faces = element.value("faces").toObject();
 				if (faces.isEmpty()) return "ERROR: Empty model faces.";
 				for (auto f = faces.begin(); f != faces.end(); ++f) {
@@ -1017,6 +1216,13 @@ namespace CppProject
 				merged.insert("elements", elements);
 			}
 			merged.insert("textures", localTextures);
+			if (!previewOnly && hasUnshadedElements) {
+				// The block renderer does not implement Minecraft's element shade flag.
+				// Do not silently pretend that its lighting is faithfully reproduced.
+				if (QMessageBox::warning(nullptr, "Approximate model lighting",
+					"This model contains unshaded elements (shade: false). The imported/exported copy may use normal shading and look different from Minecraft. Continue?",
+					QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) return "";
+			}
 			QTemporaryDir temp(QDir::tempPath() + "/MineimatorModModel-XXXXXX");
 			if (!temp.isValid()) return "ERROR: Cannot create temporary model directory.";
 			auto write = [&temp](const QString& name, const QByteArray& data) -> bool {
@@ -1032,8 +1238,159 @@ namespace CppProject
 			temp.setAutoRemove(false);
 			return outputPath;
 		};
+		// Preview only: read a bounded subset of NeoForge OBJ/MTL from the selected
+		// JAR. The importer below deliberately continues to reject OBJ geometry.
+		auto loadObjPreview = [&](const QString& selected, ModObjScene& scene, QString& reason) -> bool {
+			reason = "OBJ preview unavailable for this model.";
+			QList<QJsonObject> layers; QSet<QString> visited; QString current=selected;
+			QJsonObject objModel;
+			for (int depth=0; depth<32; ++depth) {
+				if (visited.contains(current)) return false; visited.insert(current);
+				QString path=resourcePath(current,"models",".json"); QJsonObject layer;
+				if (path.isEmpty() || !entries.contains(path) || !readJson(path,layer)) return false;
+				layers.append(layer);
+				if (layer.contains("loader")) {
+					if (layer.value("loader").toString() != "neoforge:obj") return false;
+					objModel=layer; break;
+				}
+				if (!layer.value("parent").isString()) return false;
+				current=layer.value("parent").toString();
+			}
+			if (objModel.isEmpty() || !objModel.value("model").isString()) return false;
+			if (objModel.contains("mtl_override")) { reason="OBJ material overrides are not supported in preview."; return false; }
+			QJsonObject textures;
+			for (auto it=layers.crbegin(); it!=layers.crend(); ++it) {
+				if (it->contains("textures") && !it->value("textures").isObject()) return false;
+				QJsonObject refs=it->value("textures").toObject();
+				for (auto t=refs.begin(); t!=refs.end(); ++t) textures.insert(t.key(),t.value());
+			}
+			QString objPath=resourcePath(objModel.value("model").toString(),"","");
+			objPath.replace("//","/");
+			QByteArray objBytes;
+			if (objPath.isEmpty() || !readEntry(objPath,4*1024*1024,objBytes)) { reason="OBJ file missing or too large."; return false; }
+			QStringList lines=QString::fromUtf8(objBytes).split('\n');
+			QString mtlName;
+			for (const QString& raw : lines) {
+				QString line=raw.trimmed();
+				if (line.startsWith("mtllib ")) {
+					if (!mtlName.isEmpty()) return false;
+					mtlName=line.mid(7).trimmed();
+				}
+			}
+			if (!QRegularExpression("^[A-Za-z0-9_.-]+\\.mtl$").match(mtlName).hasMatch() || mtlName=="..") return false;
+			QString mtlPath=objPath.left(objPath.lastIndexOf('/')+1)+mtlName; QByteArray mtlBytes;
+			if (!readEntry(mtlPath,1024*1024,mtlBytes)) { reason="OBJ material file missing or too large."; return false; }
+			QMap<QString,QString> materialRefs; QString material;
+			for (const QString& raw : QString::fromUtf8(mtlBytes).split('\n')) {
+				QString line=raw.trimmed();
+				if (line.startsWith("newmtl ")) { material=line.mid(7).trimmed(); if (material.isEmpty() || materialRefs.contains(material)) return false; materialRefs.insert(material,QString()); }
+				else if (line.startsWith("map_Kd ") && !material.isEmpty()) materialRefs[material]=line.mid(7).trimmed();
+			}
+			QMap<QString,QImage> materialImages; qint64 pixels=0;
+			for (auto it=materialRefs.cbegin(); it!=materialRefs.cend(); ++it) {
+				QString ref=it.value(); QSet<QString> seen;
+				while (ref.startsWith('#')) {
+					QString key=ref.mid(1);
+					if (seen.contains(key) || !textures.value(key).isString()) { reason="OBJ material references a missing texture."; return false; }
+					seen.insert(key); ref=textures.value(key).toString();
+				}
+				QString path=resourcePath(ref,"textures",".png"); QByteArray bytes;
+				if (path.isEmpty() || !(entries.contains(path) ? readEntry(path,8388608,bytes) : (path.startsWith("assets/minecraft/") && readMc(path,8388608,bytes)))) { reason="OBJ texture missing or unsupported."; return false; }
+				QBuffer buffer(&bytes); if (!buffer.open(QIODevice::ReadOnly)) return false;
+				QImageReader reader(&buffer,"png"); QSize size=reader.size();
+				if (!size.isValid() || size.width()<=0 || size.height()<=0 || size.width()>2048 || size.height()>2048) return false;
+				pixels+=qint64(size.width())*size.height(); if (pixels>8388608) return false;
+				QImage image=reader.read(); if (image.isNull()) return false;
+				// Only animated textures are cropped; ordinary rectangular images stay intact.
+				QString metaPath=path+".mcmeta"; QByteArray metaBytes;
+				bool hasMeta=entries.contains(path) ? entries.contains(metaPath) : mcEntries.contains(metaPath);
+				if (hasMeta) {
+					bool ok=entries.contains(path) ? readEntry(metaPath,262144,metaBytes) : readMc(metaPath,262144,metaBytes);
+					QJsonParseError error; QJsonDocument meta=QJsonDocument::fromJson(metaBytes,&error);
+					if (!ok || error.error!=QJsonParseError::NoError || !meta.isObject()) return false;
+					if (meta.object().contains("animation")) {
+						if (size.height()<size.width() || size.height()%size.width()!=0) return false;
+						image=image.copy(0,0,size.width(),size.width()); // approximate first physical frame
+					}
+				}
+				materialImages.insert(it.key(),image);
+			}
+			QVector<QVector3D> vertices; QVector<QPointF> uv; material.clear();
+			const bool flipV=objModel.value("flip_v").toBool(false);
+			const QRegularExpression spaces("\\s+");
+			for (const QString& raw : lines) {
+				QString line=raw.trimmed(); if (line.isEmpty() || line.startsWith('#')) continue;
+				QStringList parts=line.split(spaces,Qt::SkipEmptyParts); if (parts.isEmpty()) continue;
+				if (parts[0]=="v" || parts[0]=="vt") {
+					int count=parts[0]=="v" ? 3 : 2; if (parts.size()<count+1) return false;
+					double vals[3]={0,0,0};
+					for (int i=0; i<count; ++i) { bool ok=false; vals[i]=parts[i+1].toDouble(&ok); if (!ok || !std::isfinite(vals[i]) || std::abs(vals[i])>4096) return false; }
+					if (count==3) { vertices.append(QVector3D(vals[0],vals[1],vals[2])); if (vertices.size()>100000) return false; }
+					else { uv.append(QPointF(vals[0],flipV ? 1-vals[1] : vals[1])); if (uv.size()>100000) return false; }
+				} else if (parts[0]=="usemtl") {
+					if (parts.size()!=2 || !materialImages.contains(parts[1])) return false; material=parts[1];
+				} else if (parts[0]=="f") {
+					if (parts.size()<4 || parts.size()>5 || !materialImages.contains(material)) return false;
+					QVector<int> vi, ti;
+					for (int i=1; i<parts.size(); ++i) {
+						QStringList idx=parts[i].split('/'); if (idx.size()<2) return false;
+						bool okV=false,okT=false; int v=idx[0].toInt(&okV), t=idx[1].toInt(&okT);
+						if (!okV || !okT || v==0 || t==0) return false;
+						v = v>0 ? v-1 : vertices.size()+v; t = t>0 ? t-1 : uv.size()+t;
+						if (v<0 || v>=vertices.size() || t<0 || t>=uv.size()) return false;
+						if (uv[t].x()<0 || uv[t].x()>1 || uv[t].y()<0 || uv[t].y()>1) { reason="OBJ uses repeating or out-of-range texture coordinates."; return false; }
+						vi.append(v); ti.append(t);
+					}
+					for (int i=1; i+1<vi.size(); ++i) {
+						scene.triangles.append({vertices[vi[0]],vertices[vi[i]],vertices[vi[i+1]],uv[ti[0]],uv[ti[i]],uv[ti[i+1]],materialImages.value(material)});
+						if (scene.triangles.size()>20000) return false;
+					}
+				}
+			}
+			if (scene.triangles.isEmpty()) return false;
+			return true;
+		};
+		// Bedrock entity selection uses copies of one JAR geometry and one texture.
+		// It does not execute the mod, and does not infer the correct texture.
+		auto importBedrockJar = [&](const QString& geometryPath) -> StringType {
+			QByteArray geometry;
+			if (!readEntry(geometryPath, 8388608, geometry)) return "ERROR: Cannot read Bedrock geometry.";
+			QStringList pngPaths;
+			for (auto it=entries.cbegin(); it!=entries.cend(); ++it) {
+				const QString& name=it.key();
+				if (name.startsWith("assets/") && name.endsWith(".png",Qt::CaseInsensitive)) pngPaths.append(name);
+				if (pngPaths.size()>20000) return "ERROR: Too many textures in the JAR.";
+			}
+			if (pngPaths.isEmpty()) return "ERROR: No PNG textures found in this JAR.";
+			QDialog pick; pick.setWindowTitle("Select entity texture"); pick.resize(700,550);
+			QVBoxLayout layout(&pick);
+			QLabel note("Select the matching texture manually. Only a subset of Bedrock geometry is supported; animations are not imported."); note.setWordWrap(true); layout.addWidget(&note);
+			QLineEdit search; search.setPlaceholderText("Search textures..."); layout.addWidget(&search);
+			QListWidget textures; textures.addItems(pngPaths); layout.addWidget(&textures);
+			QCheckBox editable("Enable individual bone controls"); editable.setChecked(true); layout.addWidget(&editable);
+			QDialogButtonBox buttons(QDialogButtonBox::Ok|QDialogButtonBox::Cancel); layout.addWidget(&buttons);
+			QObject::connect(&search,&QLineEdit::textChanged,&textures,[&textures](const QString& text) {
+				for (int i=0; i<textures.count(); ++i) textures.item(i)->setHidden(!textures.item(i)->text().contains(text,Qt::CaseInsensitive));
+			});
+			QObject::connect(&buttons,&QDialogButtonBox::accepted,&pick,[&]() {
+				if (!textures.currentItem() || textures.currentItem()->isHidden()) {
+					QMessageBox::information(&pick,"Texture","Select a matching texture first."); return;
+				}
+				pick.accept();
+			});
+			QObject::connect(&buttons,&QDialogButtonBox::rejected,&pick,&QDialog::reject);
+			App->ExecDialog(&pick);
+			if (pick.result()!=QDialog::Accepted || !textures.currentItem()) return "";
+			QByteArray png;
+			if (!readEntry(textures.currentItem()->text(),8388608,png)) return "ERROR: Cannot read the selected texture.";
+			QString error, output=mod_bedrock_to_mimodel(geometry,png,editable.isChecked(),&error);
+			if (output.isEmpty()) return "ERROR: " + error;
+			return output;
+		};
+		// Constructed before the dialog so this marker runs after its destruction.
+		struct ModelPickerExitTrace { ~ModelPickerExitTrace() { DEBUG("MOD_PICKER: dialog objects destroyed"); } } exitTrace;
 		QDialog dialog;
-		dialog.setWindowTitle("Select a static mod model");
+		dialog.setWindowTitle("Select a mod model");
 		dialog.resize(1000, 570);
 		dialog.setStyleSheet(
 			"QDialog { background: #17191d; color: #e5e8ef; font-size: 13px; }"
@@ -1041,59 +1398,137 @@ namespace CppProject
 			"QLineEdit, QListWidget { background: #20242b; color: #f1f4f8; border: 1px solid #414954; border-radius: 4px; padding: 7px; }"
 			"QListWidget::item { padding: 5px; }"
 			"QListWidget::item:selected { background: #476da9; color: white; }"
+			"QTabWidget::pane { border: 1px solid #414954; }"
+			"QTabBar::tab { background: #20242b; color: #b8c1d0; padding: 7px 16px; border: 1px solid #414954; }"
+			"QTabBar::tab:selected { background: #476da9; color: white; }"
 			"QPushButton { background: #344c72; color: white; border: 1px solid #6286bc; border-radius: 4px; padding: 7px 18px; }"
 			"QPushButton:hover { background: #486a9c; }");
 		QVBoxLayout layout(&dialog);
-		QLabel caption("Select a model to see an experimental preview. Some entries are parts, variants, or unsupported models.");
+		QLabel caption("Select a model from Blocks or Entities. Drag supported static previews to rotate them.");
 		caption.setWordWrap(true); layout.addWidget(&caption);
 		QHBoxLayout* body = new QHBoxLayout(); layout.addLayout(body);
 		QVBoxLayout* left = new QVBoxLayout(); body->addLayout(left, 3);
 		QLineEdit search; search.setPlaceholderText("Search models..."); left->addWidget(&search);
-		QListWidget list; list.addItems(models); left->addWidget(&list);
+		QTabWidget tabs; left->addWidget(&tabs);
+		QWidget blocksTab, entitiesTab;
+		QVBoxLayout blocksLayout(&blocksTab), entitiesLayout(&entitiesTab);
+		QListWidget list, entityList;
+		list.addItems(models); blocksLayout.addWidget(&list);
+		QLabel emptyBlocks("No block or item JSON models found in this JAR.");
+		emptyBlocks.setWordWrap(true); blocksLayout.addWidget(&emptyBlocks); emptyBlocks.setVisible(models.isEmpty());
+		entityList.addItems(entityModels);
+		for (const QString& path : bedrockModels) {
+			QListWidgetItem* item=new QListWidgetItem("Bedrock: " + path);
+			item->setData(Qt::UserRole,path); entityList.addItem(item);
+		}
+		entitiesLayout.addWidget(&entityList);
+		QLabel emptyEntities("No supported entity resources or Bedrock .geo.json files found in this JAR.");
+		emptyEntities.setWordWrap(true); entitiesLayout.addWidget(&emptyEntities); emptyEntities.setVisible(entityModels.isEmpty() && bedrockModels.isEmpty());
+		QLabel entityNote("Entity resource files, not necessarily complete mobs. Bedrock geometry has no 3D preview here. Java-code, animations and custom renderers are not imported.");
+		entityNote.setWordWrap(true); entitiesLayout.addWidget(&entityNote);
+		QPushButton cobblemonButton("Open Cobblemon model browser...");
+		entitiesLayout.addWidget(&cobblemonButton); cobblemonButton.setVisible(isCobblemon);
+		tabs.addTab(&blocksTab,"Blocks"); tabs.addTab(&entitiesTab,"Entities");
+		if (models.isEmpty() && (!entityModels.isEmpty() || !bedrockModels.isEmpty() || isCobblemon)) tabs.setCurrentIndex(1);
+		auto activeList = [&]() -> QListWidget* { return tabs.currentIndex()==0 ? &list : &entityList; };
+		QString entityResult;
+		QObject::connect(&cobblemonButton,&QPushButton::clicked,&dialog,[&]() {
+			DEBUG("MOD_PICKER: opening Cobblemon browser");
+			QString result=mod_browse_cobblemon(entries,readEntry);
+			DEBUG("MOD_PICKER: Cobblemon browser returned");
+			if (!result.isEmpty()) { entityResult=result; dialog.accept(); }
+		});
 		QVBoxLayout* right = new QVBoxLayout(); body->addLayout(right, 2);
 		QLabel previewTitle("Preview"); right->addWidget(&previewTitle);
-		QLabel preview("Select a model from the list");
+		ModPreviewLabel preview("Select a model from the list");
 		preview.setAlignment(Qt::AlignCenter); preview.setWordWrap(true);
 		preview.setMinimumSize(300, 300);
 		preview.setStyleSheet("QLabel { background: #20242b; color: #b8c1d0; border: 1px solid #414954; border-radius: 4px; }");
 		right->addWidget(&preview, 1);
-		QLabel previewNote("Approximate preview. Acacia leaves use plains tint; unknown tints are shown without colour."); previewNote.setWordWrap(true); right->addWidget(&previewNote);
+		QLabel previewNote("Approximate preview. OBJ and flat generated items are preview-only. Unknown tints are shown without colour."); previewNote.setWordWrap(true); right->addWidget(&previewNote);
 		QPushButton openBlockbench("Open copy in Blockbench..."); right->addWidget(&openBlockbench);
 		QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel); layout.addWidget(&buttons);
 		QTimer previewTimer; previewTimer.setSingleShot(true); previewTimer.setInterval(200);
-		QObject::connect(&list, &QListWidget::currentItemChanged, &previewTimer, [&preview, &previewTimer](QListWidgetItem* item, QListWidgetItem*) {
-			previewTimer.stop(); preview.clear();
-			if (!item || item->isHidden()) { preview.setText("Select a model from the list"); return; }
-			preview.setText("Loading preview..."); previewTimer.start();
-		});
-		QObject::connect(&previewTimer, &QTimer::timeout, &dialog, [&list, &preview, &prepare]() {
-			QListWidgetItem* item = list.currentItem();
-			if (!item || item->isHidden()) { preview.setText("Select a model from the list"); return; }
-			QString path = prepare(item->text()).QStr();
-			if (path.startsWith("ERROR:")) { preview.setText(path); return; }
-			QImage image = mod_render_preview(path);
-			// Remove only the unique temporary folder created for this preview.
-			QFileInfo info(path); QDir parent = info.absoluteDir();
+		QString previewPath;
+		ModObjScene objScene;
+		double previewYaw = 40, previewElevation = 25;
+		auto cleanupPreview = [&previewPath, &objScene]() {
+			objScene.triangles.clear();
+			if (previewPath.isEmpty()) return;
+			QDir parent = QFileInfo(previewPath).absoluteDir();
 			if (parent.dirName().startsWith("MineimatorModModel-")) parent.removeRecursively();
-			if (image.isNull()) { preview.setText("Preview unavailable for this model. You may still try importing it."); return; }
-			preview.setPixmap(QPixmap::fromImage(image));
+			previewPath.clear();
+		};
+		auto redrawPreview = [&]() {
+			if (previewPath.isEmpty() && objScene.triangles.isEmpty()) return;
+			QImage image = objScene.triangles.isEmpty() ? mod_render_preview(previewPath, previewYaw, previewElevation) : mod_render_obj_preview(objScene, previewYaw, previewElevation);
+			if (image.isNull()) preview.setText("Preview unavailable for this model. You may still try importing it.");
+			else preview.setPixmap(QPixmap::fromImage(image));
+		};
+		preview.onRotate = [&](double dx, double dy) {
+			previewYaw = std::fmod(previewYaw + dx * 0.7, 360.0);
+			previewElevation = std::max(-89.0, std::min(89.0, previewElevation + dy * 0.7));
+			redrawPreview();
+		};
+		auto refreshPreview = [&]() {
+			previewTimer.stop(); cleanupPreview(); preview.clear();
+			QListWidgetItem* item=activeList()->currentItem();
+			bool bedrock=item && !item->data(Qt::UserRole).toString().isEmpty();
+			openBlockbench.setEnabled(!bedrock);
+			if (!item || item->isHidden()) { preview.setText("Select a model from the list"); return; }
+			if (bedrock) { preview.setText("Bedrock geometry: 3D preview unavailable. Press OK to select a texture and try importing."); return; }
+			preview.setText("Loading preview..."); previewTimer.start();
+		};
+		QObject::connect(&list, &QListWidget::currentItemChanged, &previewTimer, [&](QListWidgetItem*, QListWidgetItem*) {
+			if (activeList()==&list) refreshPreview();
 		});
-		QObject::connect(&search, &QLineEdit::textChanged, &list, [&list](const QString& text) {
-			QListWidgetItem* first = nullptr;
-			for (int i = 0; i < list.count(); ++i) {
-				QListWidgetItem* item = list.item(i);
-				bool visible = item->text().contains(text, Qt::CaseInsensitive);
-				item->setHidden(!visible);
-				if (visible && !first) first = item;
+		QObject::connect(&entityList, &QListWidget::currentItemChanged, &previewTimer, [&](QListWidgetItem*, QListWidgetItem*) {
+			if (activeList()==&entityList) refreshPreview();
+		});
+		QObject::connect(&tabs, &QTabWidget::currentChanged, &previewTimer, [&](int index) {
+			DEBUG(QString("MOD_PICKER: tab changed to %1").arg(index));
+			refreshPreview();
+		});
+		QObject::connect(&previewTimer, &QTimer::timeout, &dialog, [&]() {
+			QListWidgetItem* item = activeList()->currentItem();
+			if (!item || item->isHidden()) { preview.setText("Select a model from the list"); return; }
+			if (!item->data(Qt::UserRole).toString().isEmpty()) return;
+			DEBUG("MOD_PICKER: preparing preview");
+			QString path = prepare(item->text(), true).QStr();
+			DEBUG("MOD_PICKER: preview preparation returned");
+			if (path.startsWith("ERROR:")) {
+				if (path == "ERROR: This custom model loader is not supported.") {
+					QString reason;
+					DEBUG("MOD_PICKER: preparing OBJ preview");
+					if (loadObjPreview(item->text(), objScene, reason)) { redrawPreview(); DEBUG("MOD_PICKER: OBJ preview rendered"); return; }
+					objScene.triangles.clear();
+					preview.setText(path + "\n" + reason); return;
+				}
+				preview.setText(path); return;
 			}
-			list.setCurrentItem(first);
+			previewPath = path;
+			redrawPreview();
+			DEBUG("MOD_PICKER: static preview rendered");
 		});
-		QObject::connect(&openBlockbench, &QPushButton::clicked, &dialog, [&dialog, &list, &prepare]() {
-			QListWidgetItem* item = list.currentItem();
+		QObject::connect(&search, &QLineEdit::textChanged, &dialog, [&](const QString& text) {
+			for (QListWidget* modelList : {&list,&entityList}) {
+				QListWidgetItem* first = nullptr;
+				for (int i=0; i<modelList->count(); ++i) {
+					QListWidgetItem* item=modelList->item(i);
+					bool visible=item->text().contains(text,Qt::CaseInsensitive);
+					item->setHidden(!visible); if (visible && !first) first=item;
+				}
+				modelList->setCurrentItem(first);
+			}
+			refreshPreview();
+		});
+		QObject::connect(&openBlockbench, &QPushButton::clicked, &dialog, [&]() {
+			QListWidgetItem* item = activeList()->currentItem();
 			if (!item || item->isHidden()) { QMessageBox::information(&dialog, "Blockbench", "Select a model first."); return; }
 			QString exe = QFileDialog::getOpenFileName(&dialog, "Select installed Blockbench executable", "", "Applications (*.exe)");
 			if (exe.isEmpty()) return;
-			QString modelPath = prepare(item->text()).QStr();
+			QString modelPath = prepare(item->text(), false).QStr();
+			if (modelPath.isEmpty()) return; // User cancelled the lighting warning.
 			if (modelPath.startsWith("ERROR:")) { QMessageBox::warning(&dialog, "Blockbench", modelPath); return; }
 			QFileInfo info(modelPath); QDir folder=info.absoluteDir();
 			QString bbPath=mod_make_blockbench_project(modelPath);
@@ -1107,13 +1542,52 @@ namespace CppProject
 			}
 			QMessageBox::information(&dialog, "Blockbench", "A temporary copy was opened. In Blockbench use Save As to keep your changes; they are not automatically imported back.");
 		});
-		QObject::connect(&buttons, &QDialogButtonBox::accepted, &dialog, [&dialog, &list]() {
-			if (list.currentItem() && !list.currentItem()->isHidden()) dialog.accept();
-		});
+		auto acceptSelection = [&]() {
+			QListWidgetItem* item=activeList()->currentItem();
+			if (item && !item->isHidden()) dialog.accept();
+		};
+		QObject::connect(&buttons, &QDialogButtonBox::accepted, &dialog, acceptSelection);
 		QObject::connect(&buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-		QObject::connect(&list, &QListWidget::itemDoubleClicked, &dialog, [&dialog](QListWidgetItem*) { dialog.accept(); });
-		if (App->ExecDialog(&dialog) != QDialog::Accepted || !list.currentItem()) return "";
-		return prepare(list.currentItem()->text());
+		QObject::connect(&list, &QListWidget::itemDoubleClicked, &dialog, [&](QListWidgetItem*) { acceptSelection(); });
+		QObject::connect(&entityList, &QListWidget::itemDoubleClicked, &dialog, [&](QListWidgetItem*) { acceptSelection(); });
+		if (list.count()) list.setCurrentRow(0);
+		if (entityList.count()) entityList.setCurrentRow(0);
+		refreshPreview();
+		DEBUG("MOD_PICKER: opening model dialog");
+		const bool accepted = App->ExecDialog(&dialog) == QDialog::Accepted;
+		DEBUG("MOD_PICKER: model dialog closed");
+		previewTimer.stop();
+		// The dialog owns tab pages, but captured stack locals die before the
+		// pages. Disconnect while all captured variables are still alive, since
+		// page removal can emit currentChanged during widget destruction.
+		QObject::disconnect(&tabs, nullptr, &previewTimer, nullptr);
+		QObject::disconnect(&list, nullptr, &previewTimer, nullptr);
+		QObject::disconnect(&entityList, nullptr, &previewTimer, nullptr);
+		QObject::disconnect(&previewTimer, nullptr, &dialog, nullptr);
+		QObject::disconnect(&search, nullptr, &dialog, nullptr);
+		QObject::disconnect(&list, nullptr, &dialog, nullptr);
+		QObject::disconnect(&entityList, nullptr, &dialog, nullptr);
+		QObject::disconnect(&openBlockbench, nullptr, &dialog, nullptr);
+		QObject::disconnect(&cobblemonButton, nullptr, &dialog, nullptr);
+		QObject::disconnect(&buttons, nullptr, &dialog, nullptr);
+		preview.onRotate = nullptr;
+		cleanupPreview();
+		DEBUG("MOD_PICKER: preview cleaned and signals disconnected");
+		if (!accepted) return "";
+		if (!entityResult.isEmpty()) return entityResult;
+		QListWidgetItem* selected=activeList()->currentItem();
+		if (!selected || selected->isHidden()) return "";
+		QString bedrockPath=selected->data(Qt::UserRole).toString();
+		if (!bedrockPath.isEmpty()) {
+			DEBUG("MOD_PICKER: opening Bedrock import");
+			StringType result=importBedrockJar(bedrockPath);
+			DEBUG("MOD_PICKER: Bedrock import returned");
+			return result;
+		}
+		DEBUG("MOD_PICKER: preparing selected static model");
+		StringType result=prepare(selected->text(), false);
+		DEBUG("MOD_PICKER: selected static model preparation returned");
+		return result;
 	}
 
 	RealType lib_unzip(StringType src, StringType dst)

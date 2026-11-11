@@ -2,6 +2,12 @@
 
 function tab_timeline()
 {
+	if (graph_mode)
+	{
+		tab_graph_editor()
+		return 0
+	}
+
 	var itemh, itemhalf, indent;
 	var tlx, tly, tlw, tlh, tlmaxw, tlstartpos, tlhierarchy;
 	var listx, listy, listw, listh;
@@ -969,12 +975,21 @@ function tab_timeline()
 	draw_divide_vertical(content_x + listw, tly - barh, content_height - headerh)
 	draw_divide(content_x, bary, listw)
 	
+	// Original curve-and-nodes icon, immediately left of the search/filter.
+	if (graph_toggle_button(listx + 8, bary + 4))
+	{
+		graph_mode = true
+		graph_x_start = timeline.hor_scroll.value / max(0.25, timeline_zoom)
+		graph_x_scale = timeline_zoom
+		graph_fit_pending = true
+	}
+
 	// Filter (advanced mode only)
 	if (setting_advanced_mode)
 	{
-		if (draw_button_icon("timelinefilter", listx + 8, bary + 4, 24, 24, setting_timeline_hide_ghosts || !array_equals(timeline_hide_color_tag, array_create(array_length(timeline_hide_color_tag), false)), icons.FILTER, null, false, "tooltiptlfilter"))
+		if (draw_button_icon("timelinefilter", listx + 36, bary + 4, 24, 24, setting_timeline_hide_ghosts || !array_equals(timeline_hide_color_tag, array_create(array_length(timeline_hide_color_tag), false)), icons.FILTER, null, false, "tooltiptlfilter"))
 		{
-			menu_settings_set(listx + 8, bary + 4, "timelinefilter", 24)
+			menu_settings_set(listx + 36, bary + 4, "timelinefilter", 24)
 			settings_menu_script = tl_filter_draw
 			settings_menu_above = true
 		}
@@ -985,8 +1000,8 @@ function tab_timeline()
 	
 	// Draw search bar
 	var searchx, searchwid;
-	searchx = (setting_advanced_mode ? listx + (24 + 16) : listx + 8) 
-	searchwid = (setting_advanced_mode ? listw - (24 + 24) : listw - 16) 
+	searchx = (setting_advanced_mode ? listx + 68 : listx + 36)
+	searchwid = max(0, (setting_advanced_mode ? listw - 76 : listw - 44))
 	timeline.tbx_search.text = timeline_search
 	draw_textfield("timelinesearch", searchx, bary + 4, searchwid, 24, timeline.tbx_search, action_tl_search, text_get("listsearch"), "none")
 	
@@ -1327,7 +1342,7 @@ function tab_timeline()
 			draw_set_font(font_caption)
 			
 			// Check contents array and display the icon/amount
-			for (var i = 0; i < e_tl_type.amount - 1; i++)
+			for (var i = 0; i < e_tl_type.amount; i++)
 			{
 				if (tl.tree_contents[i] = 0)
 					continue

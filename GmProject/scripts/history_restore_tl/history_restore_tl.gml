@@ -3,7 +3,7 @@
 /// @arg [tl]
 /// @desc Restores a saved timeline from memory.
 
-function history_restore_tl(save, tl = null)
+function history_restore_tl(save, tl = null, restore_part_list = false)
 {
 	if (tl = null)
 		tl = new_obj(obj_timeline)
@@ -15,6 +15,16 @@ function history_restore_tl(save, tl = null)
 	{
 		save_id = save.save_id
 		tl_find_save_ids()
+
+		// Only attach parts that were actually in their owner's list before
+		// deletion. A restored model root rebuilds its own list below.
+		if (restore_part_list && save.part_restore_index >= 0 && part_of != null && part_of.part_list != null && ds_list_find_index(part_of.part_list, id) < 0)
+		{
+			var part_index = save.part_restore_index;
+			if (part_index > ds_list_size(part_of.part_list))
+				part_index = ds_list_size(part_of.part_list)
+			ds_list_insert(part_of.part_list, part_index, id)
+		}
 		
 		if (temp != null && part_of = null)
 			temp.count++
@@ -57,7 +67,7 @@ function history_restore_tl(save, tl = null)
 		
 		// Restore tree recursively
 		for (var t = 0; t < save.tree_amount; t++)
-			history_restore_tl(save.tree_save_obj[t])
+			history_restore_tl(save.tree_save_obj[t], null, restore_part_list)
 		
 		// Restore parts
 		if (save.part_amount > 0)

@@ -35,6 +35,17 @@ function tl_update_value_types()
 		return 0
 	}
 	
+	if (type = e_tl_type.VOLUME)
+	{
+		value_type[e_value_type.HIERARCHY] = true
+		value_type[e_value_type.TRANSFORM] = true
+		value_type[e_value_type.TRANSFORM_POS] = true
+		value_type[e_value_type.TRANSFORM_ROT] = true
+		value_type[e_value_type.TRANSFORM_SCA] = true
+		value_type[e_value_type.VOLUME] = true
+		return 0
+	}
+
 	// Info
 	value_type[e_value_type.HIERARCHY] = true
 	value_type[e_value_type.APPEARANCE] = true

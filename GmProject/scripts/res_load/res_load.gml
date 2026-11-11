@@ -275,6 +275,90 @@ function res_load(reload = false)
 				res_update_model_shape()
 				model_shape_update_color()
 			}
+			else if (filename_ext(fn) = ".mimesh")
+			{
+				// MSH1: groups of position, normal and UV floats.
+				model_format = e_model_format.BLOCK
+				model_file = null
+				block_vbuffer = null
+				var mesh_buffer = buffer_load_lib(fn)
+				var mesh_size = buffer_get_size(mesh_buffer)
+				var mesh_valid = mesh_size >= 8 && mesh_size <= 32000300
+				var mesh_groups = 0
+				if (mesh_valid)
+				{
+					mesh_valid = buffer_read(mesh_buffer, buffer_u32) = 826823501
+					mesh_groups = buffer_read(mesh_buffer, buffer_u32)
+					mesh_valid = mesh_valid && mesh_groups > 0 && mesh_groups <= 64
+				}
+				var mesh_total = 0
+				for (var mg = 0; mg < mesh_groups && mesh_valid; mg++)
+				{
+					if (buffer_tell(mesh_buffer) + 4 > mesh_size)
+					{
+						mesh_valid = false
+						break
+					}
+					var mesh_count = buffer_read(mesh_buffer, buffer_u32)
+					mesh_total += mesh_count
+					if (mesh_count mod 3 != 0 || mesh_total > 1000000 || buffer_tell(mesh_buffer) + mesh_count * 32 > mesh_size)
+					{
+						mesh_valid = false
+						break
+					}
+					buffer_seek(mesh_buffer, buffer_seek_relative, mesh_count * 32)
+				}
+				if (!mesh_valid || mesh_total = 0 || buffer_tell(mesh_buffer) != mesh_size)
+				{
+					buffer_delete(mesh_buffer)
+					log("Invalid experimental mesh", fn)
+					error("errorloadmodel")
+					break
+				}
+				buffer_seek(mesh_buffer, buffer_seek_start, 8)
+				model_block_map = ds_map_create()
+				model_texture_map = ds_map_create()
+				model_texture_material_map = ds_map_create()
+				vertex_rgb = c_white
+				vertex_alpha = 1
+				vertex_wave = e_vertex_wave.NONE
+				vertex_emissive = 0
+				vertex_subsurface = 0
+				for (var mg = 0; mg < mesh_groups; mg++)
+				{
+					var mesh_key = "mesh" + string(mg)
+					var mesh_texture_file = load_folder + "/" + filename_new_ext(filename, "") + "/" + mesh_key + ".png"
+					if (!file_exists_lib(mesh_texture_file))
+						mesh_texture_file = load_folder + "/" + mesh_key + ".png"
+					model_texture_map[?mesh_key] = texture_create_square(mesh_texture_file)
+					var mesh_material_key = mesh_key + "_material"
+					var mesh_material_file = load_folder + "/" + filename_new_ext(filename, "") + "/" + mesh_material_key + ".png"
+					if (!file_exists_lib(mesh_material_file))
+						mesh_material_file = load_folder + "/" + mesh_material_key + ".png"
+					if (file_exists_lib(mesh_material_file))
+						model_texture_material_map[?mesh_material_key] = texture_create_square(mesh_material_file)
+					var mesh_count = buffer_read(mesh_buffer, buffer_u32)
+					var mesh_vbuffer = vbuffer_start()
+					model_block_map[?mesh_key] = mesh_vbuffer
+					for (var mv = 0; mv < mesh_count; mv++)
+					{
+						var mx = buffer_read(mesh_buffer, buffer_f32)
+						var my = buffer_read(mesh_buffer, buffer_f32)
+						var mz = buffer_read(mesh_buffer, buffer_f32)
+						var mnx = buffer_read(mesh_buffer, buffer_f32)
+						var mny = buffer_read(mesh_buffer, buffer_f32)
+						var mnz = buffer_read(mesh_buffer, buffer_f32)
+						var mu = buffer_read(mesh_buffer, buffer_f32)
+						var mvcoord = buffer_read(mesh_buffer, buffer_f32)
+						vertex_add(mx, my, mz, mnx, mny, mnz, mu, mvcoord)
+					}
+					vertex_end(mesh_vbuffer)
+					mesh_vbuffer = vbuffer_generate_tangents(mesh_vbuffer)
+					model_block_map[?mesh_key] = mesh_vbuffer
+					vertex_freeze(mesh_vbuffer)
+				}
+				buffer_delete(mesh_buffer)
+			}
 			else
 			{
 				model_format = e_model_format.BLOCK

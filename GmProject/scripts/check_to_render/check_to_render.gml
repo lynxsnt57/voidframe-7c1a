@@ -3,6 +3,10 @@
 ///@arg view
 
 function check_to_render(view){
+	// Physics changes poses while the timeline and camera can remain still.
+	// Invalidate both viewports without requiring camera navigation or a mouse button.
+	if (app.rb_session == 1 || app.rb_job || app.sm_preview)
+		render_low_drawing = 0
 		if (setting_viewport_optimization){
 			if (string(view) == string(view_main)) {
 				

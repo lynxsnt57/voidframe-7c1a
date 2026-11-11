@@ -88,7 +88,7 @@ function render_world_particle()
 					
 					with (temp)
 						res = temp_get_model_texobj(null)
-					render_world_block_map(temp.model.model_block_map, res)
+					render_world_block_map(temp.model.model_block_map, res, temp.model)
 					break
 				}
 			}

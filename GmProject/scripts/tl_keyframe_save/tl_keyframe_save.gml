@@ -38,12 +38,12 @@ function tl_keyframe_save(kf)
 	
 	if (kf.value[e_value.TEXTURE_OBJ] > 0)
 	{
-		kf.value[e_value.TEXTURE_OBJ].save = true
-		
-		// Camera used as texture
-		if (kf.value[e_value.TEXTURE_OBJ].type = e_tl_type.CAMERA)
+		// Timeline textures must be queued before setting the save flag.
+		if (kf.value[e_value.TEXTURE_OBJ].object_index = obj_timeline)
 			with (kf.value[e_value.TEXTURE_OBJ])
 				tl_save()
+		else
+			kf.value[e_value.TEXTURE_OBJ].save = true
 	}
 	
 	if (kf.value[e_value.TEXTURE_MATERIAL_OBJ] > 0)

@@ -312,6 +312,7 @@ function view_draw(view)
 		{
 			view.effects = !view.effects
 			render_samples = -1
+			render_low_drawing = 0
 		}
 	}
 	

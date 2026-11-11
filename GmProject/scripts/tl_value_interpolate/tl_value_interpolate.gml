@@ -6,6 +6,12 @@
 
 function tl_value_interpolate(vid, p, val1, val2)
 {
+ if (vid >= e_value.GRAPH_KEY_MASK && vid <= e_value.GRAPH_SCA_Z_LIMIT_MAX) return val1
+
+	// Curve metadata is categorical, never eased between keys.
+	if (vid >= e_value.GRAPH_POS_X_MODE && vid <= e_value.GRAPH_SCA_Z_IN_Y)
+		return val1
+
 	switch (vid)
 	{
 		case e_value.RGB_ADD:
@@ -18,6 +24,8 @@ function tl_value_interpolate(vid, p, val1, val2)
 		case e_value.GLOW_COLOR:
 		case e_value.SUBSURFACE_COLOR:
 		case e_value.LIGHT_COLOR:
+		case e_value.VOLUME_TOP_COLOR:
+		case e_value.VOLUME_EMISSION_COLOR:
 		case e_value.CAM_BLOOM_BLEND:
 		case e_value.CAM_COLOR_BURN:
 		case e_value.CAM_VIGNETTE_COLOR:
@@ -50,6 +58,13 @@ function tl_value_interpolate(vid, p, val1, val2)
 		case e_value.CAM_WIDTH:
 		case e_value.CAM_HEIGHT:
 		case e_value.ITEM_SLOT: return floor(val1 + p * (val2 - val1)) // No decimals
+		case e_value.LIGHT_GOBO_ENABLED:
+		case e_value.VOLUME_SHAPE:
+		case e_value.VOLUME_PHASE:
+		case e_value.VOLUME_GRADIENT:
+		case e_value.VOLUME_NOISE_WORLD:
+		case e_value.LIGHT_GOBO_TILING:
+		case e_value.LIGHT_GOBO_INVERT:
 		case e_value.SPAWN:
 		case e_value.FREEZE:
 		case e_value.CLEAR:
@@ -74,6 +89,15 @@ function tl_value_interpolate(vid, p, val1, val2)
 		case e_value.COPY_SCALE_X:
 		case e_value.COPY_SCALE_Y:
 		case e_value.COPY_SCALE_Z:
+		case e_value.SECONDARY_MODE:
+		case e_value.RB_ENABLED:
+		case e_value.RB_MODE:
+		case e_value.RB_SHAPE:
+		case e_value.RB_JOINT:
+		case e_value.RB_PARENT:
+		case e_value.RB_LAYER:
+		case e_value.RB_MASK:
+		case e_value.SECONDARY_ENABLED:
 		case e_value.MODIFIER_SHAKE:
 		case e_value.MODIFIER_SHAKE_POSITION:
 		case e_value.MODIFIER_SHAKE_ROTATION:

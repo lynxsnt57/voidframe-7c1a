@@ -10,6 +10,10 @@ function tab_frame_editor_modifier()
 	if (collapse_map[?"modifier"])
 	{
 		tab_collapse_start()
+
+		tab_frame_editor_rigidbody()
+		tab_frame_editor_rig_auto_tools()
+		tab_frame_editor_secondary()
 		
 		//Modifier Frame skip
 		tab_control_switch()

@@ -27,6 +27,73 @@ function bench_draw_settings(bx, by, bw, bh)
 	
 	var sy = dy;
 	
+	// Experimental static GLB importer. It prepares a project-owned mesh copy.
+	if (bench_mesh_selected)
+	{
+		draw_label("3D import (experimental)", dx, dy, fa_left, fa_top, c_text_main, a_text_main, font_caption)
+		dy += 32
+		var mesh_notice = string_wrap("glTF / GLB: standard import freezes skins. Smooth bones use vertex weights; rigid bones may split at joints. Morphs use default weights; animation clips and translucent materials are not imported. Review the import report.", dw - 8)
+		draw_label(mesh_notice, dx, dy, fa_left, fa_top, c_text_main, a_text_main, font_caption)
+		dy += 16 * (2 + string_count("\n", mesh_notice))
+		var glb_import_mode = 0
+		if (draw_button_label("benchmeshopen", dx, dy, dw, icons.MODEL, e_button.SECONDARY)) glb_import_mode = 1
+		dy += 40
+		if (draw_button_label("benchmeshselect", dx, dy, dw, icons.MODEL, e_button.SECONDARY)) glb_import_mode = 2
+		dy += 40
+		if (draw_button_label("benchmeshrigid", dx, dy, dw, icons.MODEL, e_button.SECONDARY)) glb_import_mode = 3
+		dy += 40
+		if (draw_button_label("benchmeshsmooth", dx, dy, dw, icons.MODEL, e_button.SECONDARY)) glb_import_mode = 4
+		dy += 40
+		if (glb_import_mode != 0)
+		{
+			var glb_filename = file_dialog_open("glTF / GLB model (*.gltf;*.glb)|*.gltf;*.glb;", "", "", "Select glTF / GLB model")
+			if (file_exists_lib(glb_filename))
+			{
+				var mesh_prepared = ""
+				if (glb_import_mode = 1) mesh_prepared = import_glb_model(glb_filename)
+				else if (glb_import_mode = 2) mesh_prepared = import_glb_model_select_mesh(glb_filename)
+				else if (glb_import_mode = 3) mesh_prepared = import_glb_model_rigid(glb_filename)
+				else mesh_prepared = import_glb_model_smooth(glb_filename)
+				if (string_pos("ERROR:", mesh_prepared) = 1)
+					bench_mesh_info = mesh_prepared
+				else if (mesh_prepared != "")
+				{
+					bench_click(e_tl_type.MODEL)
+					var mesh_res = new_res(mesh_prepared, e_res_type.MODEL)
+					if (mesh_res.replaced)
+					{
+						res_edit = mesh_res
+						action_res_replace(mesh_prepared)
+					}
+					else
+						with (mesh_res) res_load()
+					history_set_res(action_bench_model, mesh_prepared, bench_settings.model, mesh_res)
+					with (bench_settings)
+					{
+						model = mesh_res
+						temp_update_model()
+						temp_update_model_shape()
+						with (preview)
+						{
+							preview_reset_view()
+							update = true
+						}
+					}
+					draw_set_alpha(prevalpha)
+					return 0
+				}
+			}
+		}
+		if (bench_mesh_info != "")
+		{
+			var mesh_info_wrapped = string_wrap(bench_mesh_info, dw - 8)
+			draw_label(mesh_info_wrapped, dx, dy, fa_left, fa_top, c_text_main, a_text_main, font_caption)
+			dy += 16 * (1 + string_count("\n", mesh_info_wrapped))
+		}
+		draw_set_alpha(prevalpha)
+		return 0
+	}
+
 	// The Mods panel is a UI-only placeholder; never create a timeline asset.
 	if (bench_mods_selected)
 	{

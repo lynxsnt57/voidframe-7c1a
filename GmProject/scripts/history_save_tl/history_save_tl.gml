@@ -14,6 +14,10 @@ function history_save_tl(tl)
 	{
 		save_id = tl.save_id
 		tl_get_save_ids()
+		// Preserve whether this part belonged to its root list, and where.
+		part_restore_index = -1
+		if (tl.part_of != null && tl.part_of.part_list != null)
+			part_restore_index = ds_list_find_index(tl.part_of.part_list, tl)
 		
 		// Save values
 		for (var v = 0; v < e_value.amount; v++)

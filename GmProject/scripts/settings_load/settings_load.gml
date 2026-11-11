@@ -34,6 +34,14 @@ function settings_load()
 		
 		log("load_format", load_format)
 		
+		// Optional UI-only graph preferences; missing keys keep safe defaults.
+		var graphmap = map[?"graph_editor"];
+		if (ds_map_valid(graphmap))
+		{
+			var graphkeys = graph_option_keys();
+			for (var gi = 0; gi < array_length(graphkeys); gi++)
+				setting_graph_options[gi] = graph_option_clamp(gi, value_get_real(graphmap[?graphkeys[gi]], setting_graph_options[gi]))
+		}
 		// Assets
 		var assetsmap = map[?"assets"];
 		if (ds_map_valid(assetsmap))
@@ -139,6 +147,7 @@ function settings_load()
 				setting_interface_scale = value_get_real(interfacemap[?"scale"], setting_interface_scale)
 			interface_scale_set(setting_interface_scale)
 			
+			setting_rotation_space = clamp(floor(value_get_real(interfacemap[?"rotation_space"], setting_rotation_space)), 0, 2)
 			setting_separate_tool_modes = value_get_real(interfacemap[?"separate_tool_modes"], setting_separate_tool_modes)
 			if (setting_separate_tool_modes)
 			{

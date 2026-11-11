@@ -9,6 +9,28 @@ function res_save()
 	// Save model's own textures
 	if (type = e_res_type.MODEL)
 	{
+		// Copy internal geometry alongside the .mimodel on import and Save As.
+		if (model_format = e_model_format.MIMODEL && model_file != null)
+		{
+			for (var p = 0; p < ds_list_size(model_file.file_part_list); p++)
+			{
+				var part = model_file.file_part_list[|p]
+				if (part.shape_list != null)
+				{
+					for (var s = 0; s < ds_list_size(part.shape_list); s++)
+					{
+						var shape = part.shape_list[|s]
+						if (shape.type = "glb_mesh")
+						{
+							directory_create_lib(save_folder + "/" + filename_dir(shape.mesh_filename))
+							file_copy_lib(load_folder + "/" + shape.mesh_filename, save_folder + "/" + shape.mesh_filename)
+							if (shape.skin_filename != "")
+								file_copy_lib(load_folder + "/" + shape.skin_filename, save_folder + "/" + shape.skin_filename)
+						}
+					}
+				}
+			}
+		}
 		var name, key;
 		name = filename_new_ext(filename, "")
 		

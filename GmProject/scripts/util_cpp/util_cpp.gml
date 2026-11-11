@@ -445,3 +445,79 @@ function mod_import_bedrock_file()
 {
 	return "ERROR: C++ build required."
 }
+
+/// CppSeparate StringType import_glb_model(StringType)
+/// Convert an embedded static GLB to a project mesh.
+function import_glb_model(filename)
+{
+	return "ERROR: C++ build required."
+}
+
+/// CppSeparate StringType import_glb_model_select_mesh(StringType)
+/// Convert an embedded GLB with an explicit mesh selection.
+function import_glb_model_select_mesh(filename)
+{
+	return "ERROR: C++ build required."
+}
+
+/// CppSeparate StringType import_glb_model_rigid(StringType)
+/// Convert an embedded GLB to experimental rigid bone parts.
+function import_glb_model_rigid(filename)
+{
+	return "ERROR: C++ build required."
+}
+
+/// CppSeparate StringType import_glb_model_smooth(StringType)
+function import_glb_model_smooth(filename)
+{
+    return "ERROR: C++ build required."
+}
+
+/// CppSeparate IntType glb_smooth_update(StringType, StringType, ArrType, MatrixType, IntType)
+function glb_smooth_update(meshpath, skinpath, joints, owner, previous)
+{
+    return 0
+}
+
+/// CppSeparate MatrixType secondary_motion_update(IntType, MatrixType, ArrType, RealType)
+function secondary_motion_update(timeline_id, base_matrix, settings, seconds)
+{
+    return base_matrix
+}
+
+/// CppSeparate void secondary_motion_release(IntType)
+function secondary_motion_release(timeline_id)
+{
+}
+
+/// CppSeparate ArrType secondary_motion_tip(IntType)
+function secondary_motion_tip(timeline_id) { return [] }
+/// CppSeparate void secondary_motion_grab(IntType, ArrType, RealType)
+function secondary_motion_grab(timeline_id, target, active) { }
+
+/// CppSeparate void rigid_clear()
+function rigid_clear() { }
+/// CppSeparate RealType rigid_add(IntType, MatrixType, ArrType)
+function rigid_add(timeline, base, settings) { return 0 }
+/// CppSeparate RealType rigid_build()
+function rigid_build() { return 0 }
+/// CppSeparate void rigid_target(IntType, MatrixType, RealType)
+function rigid_target(timeline, target, enabled) { }
+/// CppSeparate RealType rigid_step(RealType)
+function rigid_step(seconds) { return 0 }
+/// CppSeparate RealType rigid_store(IntType)
+function rigid_store(frame) { return 0 }
+/// CppSeparate MatrixType rigid_result(IntType, MatrixType, RealType)
+function rigid_result(timeline, base, frame) { return base }
+/// CppSeparate StringType rigid_error()
+function rigid_error() { return "Native C++ build required." }
+/// CppSeparate RealType rigid_count()
+function rigid_count() { return 0 }
+/// CppSeparate ArrType rigid_debug(IntType, MatrixType)
+function rigid_debug(timeline, base) { return [] }
+
+/// CppSeparate ArrType rigid_euler(MatrixType, ArrType)
+function rigid_euler(local_matrix, reference) { return [] }
+
+/// CppSeparate RealType rigid_ground(RealType, RealType, RealType)
+function rigid_ground(enabled,height,friction) { return 0 }

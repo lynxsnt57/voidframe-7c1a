@@ -38,18 +38,61 @@ function view_control_rotate(view)
 	xrot = matrix_multiply(matrix_build(0, 0, 0, 0, -90, tl_edit.value[tl_edit.value[e_value.COPY_ROT_Z] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_Z : e_value.ROT_Z], 1, 1, 1), zrot)
 	yrot = matrix_multiply(matrix_build(0, 0, 0, tl_edit.value[tl_edit.value[e_value.COPY_ROT_X] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_X : e_value.ROT_X] + 90, 0, tl_edit.value[tl_edit.value[e_value.COPY_ROT_Z] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_Z : e_value.ROT_Z], 1, 1, 1), zrot)
 	
+    // Only ordinary single-object rotation uses the new spaces. Constraints and
+    // multi-selection retain the original gimbal implementation.
+    var space = setting_rotation_space;
+    if (tl_edit_amount != 1 || !tl_edit.inherit_rotation || tl_edit.value[e_value.ROT_TARGET] != null || tl_edit.value[e_value.LOOK_AT_TARGET] != null || tl_edit.value[e_value.IK_TARGET] != null || tl_edit.value[e_value.MODIFIER_SHAKE])
+        space = 0
+    if (space != 0)
+    {
+        var basis;
+        if (space = 1)
+        {
+            basis = array_copy_1d(tl_edit.matrix)
+            matrix_remove_scale(basis)
+        }
+        else
+        {
+            basis = matrix_build(0, 0, 0, 0, 0, 0, 1, 1, 1)
+            basis[MAT_X] = tl_edit.matrix[MAT_X]
+            basis[MAT_Y] = tl_edit.matrix[MAT_Y]
+            basis[MAT_Z] = tl_edit.matrix[MAT_Z]
+        }
+        zrot = basis
+        xrot = matrix_multiply(matrix_build(0, 0, 0, 0, -90, 0, 1, 1, 1), basis)
+        yrot = matrix_multiply(matrix_build(0, 0, 0, 90, 0, 0, 1, 1, 1), basis)
+    }
+
+    var colx = c_control_red;
+    var coly = (setting_z_is_up ? c_control_green : c_control_blue);
+    var colz = (setting_z_is_up ? c_control_blue : c_control_green);
+    if (space = 1)
+    {
+        // Softer pink / sky blue / mint for object-local axes.
+        colx = make_color_rgb(255, 111, 160)
+        coly = setting_z_is_up ? make_color_rgb(98, 245, 170) : make_color_rgb(75, 185, 255)
+        colz = setting_z_is_up ? make_color_rgb(75, 185, 255) : make_color_rgb(98, 245, 170)
+    }
+    else if (space = 2)
+    {
+        // High-contrast amber / cyan / magenta for world axes.
+        colx = make_color_rgb(255, 200, 43)
+        coly = setting_z_is_up ? make_color_rgb(255, 60, 224) : make_color_rgb(40, 190, 255)
+        colz = setting_z_is_up ? make_color_rgb(40, 190, 255) : make_color_rgb(255, 60, 224)
+    }
+
 	// Draw each axis
 	if (tl_edit.value[e_value.LOOK_AT_TARGET] != null) {
 		xrot = matrix_multiply(matrix_build(0, 0, 0, 0, -90, tl_edit.value[e_value.LOOK_AT_OFFSET_Z], 1, 1, 1), zrot)
 		yrot = matrix_multiply(matrix_build(0, 0, 0, tl_edit.value[e_value.LOOK_AT_OFFSET_X] + 90, 0,tl_edit.value[e_value.LOOK_AT_OFFSET_Z], 1, 1, 1), zrot)
 
-		view_control_rotate_axis(view, e_view_control.ROT_X, e_value.LOOK_AT_OFFSET_X, c_control_red, xrot, len)
-		view_control_rotate_axis(view, e_view_control.ROT_Y, e_value.LOOK_AT_OFFSET_Y, (setting_z_is_up ? c_control_green : c_control_blue), yrot, len)
-		view_control_rotate_axis(view, e_view_control.ROT_Z, e_value.LOOK_AT_OFFSET_Z, (setting_z_is_up ? c_control_blue : c_control_green), zrot, len)
+		view_control_rotate_axis(view, e_view_control.ROT_X, e_value.LOOK_AT_OFFSET_X, colx, xrot, len)
+		view_control_rotate_axis(view, e_view_control.ROT_Y, e_value.LOOK_AT_OFFSET_Y, coly, yrot, len)
+		view_control_rotate_axis(view, e_view_control.ROT_Z, e_value.LOOK_AT_OFFSET_Z, colz, zrot, len)
 	} else {
-		view_control_rotate_axis(view, e_view_control.ROT_X, tl_edit.value[e_value.COPY_ROT_X] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_X : e_value.ROT_X, c_control_red, xrot, len)
-		view_control_rotate_axis(view, e_view_control.ROT_Y, tl_edit.value[e_value.COPY_ROT_Y] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_Y : e_value.ROT_Y, (setting_z_is_up ? c_control_green : c_control_blue), yrot, len)
-		view_control_rotate_axis(view, e_view_control.ROT_Z, tl_edit.value[e_value.COPY_ROT_Z] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_Z : e_value.ROT_Z, (setting_z_is_up ? c_control_blue : c_control_green), zrot, len)	
+		view_control_rotate_axis(view, e_view_control.ROT_X, tl_edit.value[e_value.COPY_ROT_X] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_X : e_value.ROT_X, colx, xrot, len)
+		view_control_rotate_axis(view, e_view_control.ROT_Y, tl_edit.value[e_value.COPY_ROT_Y] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_Y : e_value.ROT_Y, coly, yrot, len)
+		view_control_rotate_axis(view, e_view_control.ROT_Z, tl_edit.value[e_value.COPY_ROT_Z] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_Z : e_value.ROT_Z, colz, zrot, len)
 	}
 	// Is dragging
 	if (window_busy = "rendercontrol" && view_control_edit_view = view && view_control_edit >= e_view_control.ROT_X && view_control_edit <= e_view_control.ROT_Z)
@@ -82,6 +125,28 @@ function view_control_rotate(view)
 			if (!setting_snap_absolute && dragger_snap)
 				axesang = snap(axesang, snapval)
 			
+            if (app.view_rotation_drag_mode != 0)
+            {
+                // Apply a true axis rotation to the captured orientation, then
+                // convert back to the port's Euler values for keyframe storage.
+                if (dragger_snap)
+                    axesang = snap(view_control_move_distance, snapval)
+                var delta = matrix_build(0, 0, 0, axis_edit = X ? axesang : 0, axis_edit = Y ? axesang : 0, axis_edit = Z ? axesang : 0, 1, 1, 1);
+                var startrot = app.view_rotation_start;
+                var startmat = matrix_create(vec3(0), startrot, vec3(1));
+                var resultmat;
+                if (app.view_rotation_drag_mode = 1)
+                    resultmat = matrix_multiply(delta, startmat)
+                else
+                    resultmat = matrix_multiply(matrix_multiply(matrix_multiply(startmat, app.view_rotation_parent), delta), matrix_inverse(app.view_rotation_parent))
+                var resultrot = matrix_rotation(resultmat);
+                tl_value_set_start(action_tl_frame_rot, true)
+                for (var axis = X; axis <= Z; axis++)
+                    tl_value_set(e_value.ROT_X + axis, angle_difference_fix(resultrot[axis], tl_edit.value[e_value.ROT_X + axis]), true)
+                tl_value_set_done()
+            }
+            else
+            {
 			newval = view_control_value + axesang
 			if (tl_edit.value[e_value.LOOK_AT_TARGET] != null)
 				newval = tl_value_clamp(e_value.LOOK_AT_OFFSET_X + axis_edit, newval)
@@ -103,6 +168,7 @@ function view_control_rotate(view)
 			else
 				tl_value_set((tl_edit.value[e_value.COPY_ROT_X + axis_edit] && tl_edit.value[e_value.ROT_TARGET] != null ? e_value.COPY_ROT_OFFSET_X : e_value.ROT_X) + axis_edit, newval, true)
 			tl_value_set_done()
+            }
 		}
 		
 		// Release

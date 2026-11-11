@@ -70,6 +70,10 @@ function tl_event_create()
 	modifier_shake_pos = vec3(0)
 	modifier_shake_rot = vec3(0)
 	modifier_shake_bend = vec3(0)
+	rb_base_matrix = []
+	rb_parent_matrix = []
+	rb_channel_parent = []
+	secondary_motion_active = false
 	modifier_shake_update = false
 	modifier_shake_auto_offset = random_range(-1000.0, 1000.0)
 	modifier_physc_pos = vec3(0)
@@ -95,7 +99,7 @@ function tl_event_create()
 	tree_list = ds_list_create()
 	tree_list_filter = ds_list_create()
 	tree_extend = false
-	tree_contents = array_create(e_tl_type.amount - 1)
+	tree_contents = array_create(e_tl_type.amount)
 	list_mouseon = false
 	
 	inherit_position = true
@@ -121,6 +125,7 @@ function tl_event_create()
 	texture_blur = false
 	texture_filtering = false
 	shadows = true
+	emitter_attached = false
 	ssao = true
 	glow = false
 	glow_texture = true

@@ -18,6 +18,9 @@ namespace CppProject
 		if (buffer->meshes.size() == 0)
 			return;
 
+		if (buffer->dynamicSkin && currentBatch->numObjects)
+			SubmitBatch();
+
 		Mesh<>* mesh = buffer->meshes[0];
 
 		// Max triangles exceeded
@@ -33,7 +36,7 @@ namespace CppProject
 		currentBatch->numObjects++;
 
 		bool submit = GFX->shader->SubmitObject();
-		if (!GFX->shader->useBatching ||
+		if (buffer->dynamicSkin || !GFX->shader->useBatching ||
 			submit ||
 			currentBatch->numObjects >= MAX_BATCH_OBJECTS ||
 			currentBatch->mesh.numIndices >= MAX_BATCH_INDICES)

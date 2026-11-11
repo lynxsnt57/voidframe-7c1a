@@ -12,7 +12,8 @@ function render_world_tl_shadow()
 		type = e_tl_type.PATH_POINT ||
 		type = e_tl_type.SPOT_LIGHT ||
 		type = e_tl_type.POINT_LIGHT ||
-		type = e_tl_type.CAMERA)
+		type = e_tl_type.CAMERA ||
+		type = e_tl_type.VOLUME)
 		return 0
 	
 	if (type = e_tl_type.MODEL && (temp.model = null || temp.model.model_format = e_model_format.MIMODEL))

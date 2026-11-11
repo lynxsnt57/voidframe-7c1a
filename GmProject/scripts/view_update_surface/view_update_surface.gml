@@ -64,7 +64,14 @@ function view_update_surface(view, cam)
 						
 						draw_set_color((tl.selected || tl.parent_is_selected) ? c_white : c_controls)
 	
-						if (tl.type = e_tl_type.SPOT_LIGHT && (setting_overlay_show_light || tl.selected))
+						if (tl.type = e_tl_type.VOLUME && tl.selected)
+						{
+							var vp = array();
+							for (var vi = 0; vi < 8; vi++)
+								array_add(vp, point3D_mul_matrix(point3D(((vi div 4) mod 2) * 16 - 8, ((vi div 2) mod 2) * 16 - 8, (vi mod 2) * 16 - 8), tl.matrix))
+							view_shape_draw(vp)
+						}
+						else if (tl.type = e_tl_type.SPOT_LIGHT && (setting_overlay_show_light || tl.selected))
 							view_shape_spotlight(tl)
 						else if (tl.type = e_tl_type.POINT_LIGHT && (setting_overlay_show_light || tl.selected))
 							view_shape_pointlight(tl)
@@ -84,6 +91,8 @@ function view_update_surface(view, cam)
 					}
 				}
 				
+				if (sm_preview && view == view_main) secondary_preview_gizmo(view)
+				if (rb_show_colliders && view == view_main) rb_draw_colliders()
 				// Controls
 				if (tl_edit != null && tl_edit != cam && view.gizmos)
 				{

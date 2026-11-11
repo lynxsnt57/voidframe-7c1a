@@ -4,6 +4,14 @@ function history_copy_render_settings(obj)
 {
 	project_render_samples = obj.project_render_samples
 	project_render_engine = obj.project_render_engine
+	project_render_volume_enabled = obj.project_render_volume_enabled
+	project_render_volume_resolution = obj.project_render_volume_resolution
+	project_render_volume_quality = obj.project_render_volume_quality
+	project_render_volume_jitter = obj.project_render_volume_jitter
+	project_render_volume_shadow_samples = obj.project_render_volume_shadow_samples
+	project_render_volume_shadow_softness = obj.project_render_volume_shadow_softness
+	project_render_volume_near = obj.project_render_volume_near
+	project_render_volume_far = obj.project_render_volume_far
 	
 	project_render_legacy_rendering = obj.project_render_legacy_rendering
 	

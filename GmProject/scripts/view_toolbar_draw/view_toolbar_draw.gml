@@ -94,6 +94,23 @@ function view_toolbar_draw(view, xx, yy)
 	}
 	yy += 24 + padding
 	
+    // The label stays visible, unlike an icon which only shows its mode on hover.
+    tip_set_keybind(e_keybind.ROTATION_SPACE)
+    tip_set(text_get("viewrotationspace" + string(setting_rotation_space)), xx, yy, 24, 32)
+    if (draw_button_label("viewrotationletter" + string(setting_rotation_space), xx, yy, 24, null, e_button.SECONDARY))
+    {
+        setting_rotation_space = (setting_rotation_space + 1) mod 3
+        render_low_drawing = 0
+        app_mouse_clear()
+    }
+    else if (content_mouseon && window_busy = "" && app_mouse_box(xx, yy, 24, 32) && mouse_right_released)
+    {
+        setting_rotation_space = (setting_rotation_space + 2) mod 3
+        render_low_drawing = 0
+        app_mouse_clear()
+    }
+    yy += 32 + padding
+
 	// Scale tool (separate tool modes)
 	if (setting_separate_tool_modes)
 	{

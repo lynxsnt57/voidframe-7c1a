@@ -31,6 +31,8 @@ function project_reset()
 	project_video_template = find_videotemplate(project_video_width, project_video_height)
 	project_video_keep_aspect_ratio = true
 	project_render_settings = render_default
+	project_glow_crisp_core = false
+	project_glow_less_blur = false
 	project_tempo = 24
 	project_composition_guide = e_composition_guide.RULE_OF_THIRDS
 	project_grid_columns = 3

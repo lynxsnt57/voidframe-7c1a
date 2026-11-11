@@ -26,7 +26,7 @@ function render_free()
 	// Rendering
 	surface_free(render_surface_shadows)
 	surface_free(render_surface_specular)
-	// surface_free(render_surface_volumetric)
+	surface_free(render_surface_volumetric)
 	
 	// Camera effects
 	surface_free(render_surface_lens)

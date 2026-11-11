@@ -90,6 +90,8 @@ function render_high_glow(prevsurf, glowfalloff = false)
 	for (var i = 0; i < 3; i++)
 	{
 		var radius = glowfalloff ? baseradius / (1 + 1.333 * i) : baseradius * (i = 0 ? 0.45 : (i = 1 ? 0.8 : 1.05));
+        if (!glowfalloff && project_glow_less_blur)
+            radius *= 0.65
 		
 		// Horizontal
 		surface_set_target(glowsurftemp)
@@ -132,7 +134,7 @@ function render_high_glow(prevsurf, glowfalloff = false)
 			with (render_shader_obj)
 			{
 				shader_set(shader)
-				shader_add_set(glowcoresurf, 0.666667, c_white)
+				shader_add_set(glowcoresurf, app.project_glow_crisp_core ? 1.0 : 0.666667, c_white)
 			}
 			draw_surface_exists(glowsurf, 0, 0)
 			with (render_shader_obj)
@@ -156,7 +158,7 @@ function render_high_glow(prevsurf, glowfalloff = false)
 		with (render_shader_obj)
 		{
 			shader_set(shader)
-			shader_add_set(glowcombined, glowfalloff ? app.project_render_glow_falloff_intensity : app.project_render_glow_intensity * 0.6, c_white, 1, app.project_render_glow_blend_mode)
+			shader_add_set(glowcombined, glowfalloff ? app.project_render_glow_falloff_intensity : app.project_render_glow_intensity * (app.project_glow_crisp_core ? 0.5 : 0.6), c_white, 1, app.project_render_glow_blend_mode)
 		}
 		draw_surface_exists(prevsurf, 0, 0)
 		with (render_shader_obj)
@@ -184,7 +186,7 @@ function render_high_glow(prevsurf, glowfalloff = false)
 			with (render_shader_obj)
 			{
 				shader_set(shader)
-				shader_add_set(glowcombined, app.project_render_glow_intensity * (glowfalloff ? 1 : 0.6), c_white)
+				shader_add_set(glowcombined, app.project_render_glow_intensity * (glowfalloff ? 1 : (app.project_glow_crisp_core ? 0.5 : 0.6)), c_white)
 			}
 			draw_surface_exists(prevsurf, 0, 0)
 			with (render_shader_obj)

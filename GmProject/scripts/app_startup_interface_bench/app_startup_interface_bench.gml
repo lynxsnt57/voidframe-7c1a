@@ -3,6 +3,8 @@
 function app_startup_interface_bench()
 {
 	bench_mods_selected = false
+	bench_mesh_selected = false
+	bench_mesh_info = ""
 	bench_mods_info = ""
 	bench_mods_path = ""
 	bench_video_path = ""
@@ -33,6 +35,7 @@ function app_startup_interface_bench()
 	list_item_add("typechar", e_tl_type.CHARACTER, "", null, icons.CHARACTER, null, bench_click)
 	list_item_add("typebodypart", e_tl_type.BODYPART, "", null, icons.PART, null, bench_click)
 	list_item_add("typemodel", e_tl_type.MODEL, "", null, icons.MODEL, null, bench_click)
+	list_item_add("typemeshimport", -2, "", null, icons.MODEL, null, bench_click)
 	
 	list_item_add("typeitem", e_tl_type.ITEM, "", null, icons.ITEM, null, bench_click)
 	list_item_add("typescenery", e_tl_type.SCENERY, "", null, icons.SCENERY, null, bench_click)
@@ -46,6 +49,7 @@ function app_startup_interface_bench()
 	list_item_add("typecamera", e_tl_type.CAMERA, "", null, icons.CAMERA, null, bench_click)
 	list_item_add("typeparticles", e_tl_type.PARTICLE_SPAWNER, "", null, icons.FIREWORKS, null, bench_click)
 	list_item_add("typelightsource", e_tl_type.LIGHT_SOURCE, "", null, icons.LIGHT_POINT, null, bench_click)
+	list_item_add("typevolume", e_tl_type.VOLUME, "", null, icons.CLOUD, null, bench_click)
 	list_item_add("typeaudio", e_tl_type.AUDIO, "", null, icons.NOTE, null, bench_click)
 	list_item_add("typevideo", e_tl_type.VIDEO, "", null, icons.MOVIE, null, bench_click)
 	list_item_add("typebackground", e_tl_type.BACKGROUND, "", null, icons.CLOUD, null, bench_click)

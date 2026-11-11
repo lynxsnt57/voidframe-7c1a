@@ -3,7 +3,13 @@
 
 function tl_value_is_bool(vid)
 {
-	return (vid = e_value.SPAWN ||
+	return (vid = e_value.RB_ENABLED || vid = e_value.SECONDARY_ENABLED ||
+			vid = e_value.VOLUME_GRADIENT ||
+			vid = e_value.VOLUME_NOISE_WORLD ||
+			vid = e_value.LIGHT_GOBO_ENABLED ||
+			vid = e_value.LIGHT_GOBO_TILING ||
+			vid = e_value.LIGHT_GOBO_INVERT ||
+			vid = e_value.SPAWN ||
 			vid = e_value.FREEZE ||
 			vid = e_value.CLEAR ||
 			vid = e_value.CUSTOM_SEED ||

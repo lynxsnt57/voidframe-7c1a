@@ -16,6 +16,45 @@ function tab_properties_render()
 	draw_button_menu("projectrendersettings", e_menu.LIST, dx, dy, dw, 24, project_render_settings, text, action_project_render_settings)
 	tab_next()
 	
+	// These project-only controls are independent of render presets.
+	// Volume controls remain available with both custom and built-in presets.
+	tab_control_switch()
+	draw_button_collapse("volumes", collapse_map[?"volumes"], action_project_volume_enabled, project_render_volume_enabled, "rendervolumes")
+	tab_next()
+	if (project_render_volume_enabled && collapse_map[?"volumes"])
+	{
+		tab_collapse_start()
+		tab_control_dragger()
+		draw_dragger("render_volume_resolution", dx, dy, dragger_width, project_render_volume_resolution * 100, 1, 25, 100, 100, 1, tab.render.tbx_volume_resolution, action_project_volume_resolution)
+		tab_next()
+		tab_control_dragger()
+		draw_dragger("render_volume_quality", dx, dy, dragger_width, project_render_volume_quality * 100, 1, 25, 400, 100, 1, tab.render.tbx_volume_quality, action_project_volume_quality)
+		tab_next()
+		tab_control_dragger()
+		draw_dragger("render_volume_jitter", dx, dy, dragger_width, project_render_volume_jitter * 100, 1, 0, 100, 100, 1, tab.render.tbx_volume_jitter, action_project_volume_jitter)
+		tab_next()
+		tab_control_dragger()
+		draw_dragger("render_volume_shadow_samples", dx, dy, dragger_width, project_render_volume_shadow_samples, 1, 1, 8, 1, 1, tab.render.tbx_volume_shadow_samples, action_project_volume_shadow_samples)
+		tab_next()
+		tab_control_dragger()
+		draw_dragger("render_volume_shadow_softness", dx, dy, dragger_width, project_render_volume_shadow_softness, 0.1, 0, 16, 0, 0.1, tab.render.tbx_volume_shadow_softness, action_project_volume_shadow_softness)
+		tab_next()
+		tab_control_dragger()
+		draw_dragger("render_volume_near", dx, dy, dragger_width, project_render_volume_near, 1, 0, 100000, 0, 1, tab.render.tbx_volume_near, action_project_volume_near)
+		tab_next()
+		tab_control_dragger()
+		draw_dragger("render_volume_far", dx, dy, dragger_width, project_render_volume_far, 1, 0, 100000, 0, 1, tab.render.tbx_volume_far, action_project_volume_far)
+		tab_next()
+		tab_collapse_end()
+	}
+
+	tab_control_switch()
+	draw_switch("renderglowcrispcore", dx, dy, project_glow_crisp_core, action_project_glow_crisp_core)
+	tab_next()
+	tab_control_switch()
+	draw_switch("renderglowlessblur", dx, dy, project_glow_less_blur, action_project_glow_less_blur)
+	tab_next()
+
 	if (project_render_settings != "")
 		return 0
 	

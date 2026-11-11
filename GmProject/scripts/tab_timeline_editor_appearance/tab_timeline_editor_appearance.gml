@@ -75,6 +75,30 @@ function tab_timeline_editor_appearance()
 		draw_dragger("timelineeditordepth", dx, dy, dragger_width, tl_edit.depth, 0.1, -no_limit, no_limit, 0, 1, tab.appearance.tbx_depth, action_tl_depth, null, true, false, "timelineeditordepthtip")
 		tab_next()
 		
+        // A shadow-casting point light follows the object, with no visible lamp mesh.
+        if (tl_edit.temp != null)
+        {
+            var attached_light = null;
+            for (var n = 0; n < ds_list_size(tl_edit.tree_list); n++)
+            {
+                var child_light = tl_edit.tree_list[|n];
+                if (child_light.type = e_tl_type.POINT_LIGHT && child_light.emitter_attached)
+                    attached_light = child_light
+            }
+            tab_control_button_label()
+            if (attached_light = null)
+            {
+                if (draw_button_label("timelineeditoraddobjectlight", dx, dy, dw, null, e_button.SECONDARY))
+                    action_emitter_light_create(tl_edit)
+            }
+            else
+            {
+                if (draw_button_label("timelineeditorobjectlightadded", dx, dy, dw, null, e_button.SECONDARY))
+                    action_tl_select(attached_light)
+            }
+            tab_next()
+        }
+
 		tab_set_collumns(true, floor(content_width/150))
 		
 		// Texture

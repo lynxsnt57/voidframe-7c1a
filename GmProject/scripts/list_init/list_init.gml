@@ -25,6 +25,45 @@ function list_init(name)
 	
 	switch (name)
 	{
+        case "rigidmotion":
+        {
+            menu_add_item(0,"Dynamic")
+            menu_add_item(1,"Static environment")
+            menu_add_item(2,"Kinematic / animated")
+            break
+        }
+
+        case "rigidshape":
+        {
+            menu_add_item(0,"Box")
+            menu_add_item(1,"Sphere")
+            break
+        }
+
+        case "rigidjoint":
+        {
+            menu_add_item(0,"None / independent")
+            menu_add_item(1,"Limited ball joint")
+            menu_add_item(2,"Hinge (local X)")
+            menu_add_item(3,"Weld / compound body")
+            break
+        }
+
+        case "secondarypresetlist":
+        {
+            menu_add_item(-1, "Custom settings")
+            var secondary_names = secondary_preset_names();
+            for (var secondary_index = 0; secondary_index < array_length(secondary_names); secondary_index++)
+                menu_add_item(secondary_index, secondary_names[secondary_index])
+            break
+        }
+        case "secondarymodelist":
+        {
+            menu_add_item(0, "Swing - hair and accessories")
+            menu_add_item(1, "Soft - spring translation")
+            break
+        }
+
 		// Skin
 		case "benchskin":
 		case "benchskinmaterial":
@@ -406,6 +445,22 @@ function list_init(name)
 		}
 		
 		// Shape type
+		case "frameeditorvolumeshape":
+        {
+            for (var vi = 0; vi < 9; vi++) menu_add_item(vi, text_get("frameeditorvolumeshape" + string(vi)))
+            break
+        }
+        case "frameeditorvolumepreset":
+        {
+            for (var vi = 0; vi < 4; vi++) menu_add_item(vi, text_get("frameeditorvolumepreset" + string(vi)))
+            break
+        }
+        case "frameeditorvolumephase":
+        {
+            for (var vi = 0; vi < 3; vi++) menu_add_item(vi, text_get("frameeditorvolumephase" + string(vi)))
+            break
+        }
+
 		case "benchshapetype":
 		{
 			for (var i = 0; i < e_shape_type.amount; i++)
@@ -1132,6 +1187,22 @@ function list_init(name)
 			break
 		}
 		
+		case "frameeditorlightgobotexture":
+		{
+			menu_add_item(null, text_get("listdefault", text_get("listnone")))
+			menu_add_item(e_option.BROWSE, text_get("listbrowse"), null, icons.FOLDER, action_tl_frame_cam_lens_dirt_tex_browse)
+			for (var i = 0; i < ds_list_size(res_list.display_list); i++)
+			{
+				var res = res_list.display_list[|i];
+				if (res.texture)
+					menu_add_item(res, res.display_name, res.texture)
+			}
+			with (obj_timeline)
+				if (type = e_tl_type.VIDEO)
+					menu_add_item(id, display_name)
+			break
+		}
+
 		// Camera lens dirt texture
 		case "frameeditorcameralensdirttexture":
 		{

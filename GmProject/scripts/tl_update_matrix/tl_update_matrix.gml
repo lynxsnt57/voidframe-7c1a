@@ -26,7 +26,7 @@ function tl_update_matrix(usepaths = false, updateik = true, updatepose = false,
 		if (!instance_exists(curtl))
 			continue
 		
-		if (app.setting_viewport_optimization && (curtl.hide || (!curtl.value_inherit[e_value.VISIBLE] && !curtl.value[e_value.VISIBLE])) && !curtl.selected)
+		if (app.setting_viewport_optimization && !app.rb_capture && app.rb_session == 0 && !curtl.secondary_motion_active && !curtl.value[e_value.SECONDARY_ENABLED] && (curtl.hide || (!curtl.value_inherit[e_value.VISIBLE] && !curtl.value[e_value.VISIBLE])) && !curtl.selected)
 			continue
 		
 		// Update children
@@ -51,7 +51,12 @@ function tl_update_matrix(usepaths = false, updateik = true, updatepose = false,
 			curtl.modifier_shake_update = false // Updated in app_update_animate
 		}
 		
+
+		// The clock is timeline time, not render passes or wall-clock FPS.
+		if (curtl.type = e_tl_type.BODYPART && (curtl.value[e_value.SECONDARY_ENABLED] || curtl.secondary_motion_active))
+			curtl.update_matrix = true
 		
+		if (app.rb_session != 0 || app.rb_capture) curtl.update_matrix = true
 		if (!curtl.update_matrix)
 			continue
 		
@@ -163,6 +168,7 @@ function tl_update_matrix(usepaths = false, updateik = true, updatepose = false,
 					matrix_parent = matrix_multiply(matrix_create(point3D(0, 0, 0), model_part.rotation, vec3(1)), matrix_parent)
 			}
 		
+			rb_channel_parent = array_copy_1d(matrix_parent)
 			// Create modifier value
 			if (updatemodifier) // Avoid creating multiple value
 				tl_update_modifier()
@@ -418,6 +424,44 @@ function tl_update_matrix(usepaths = false, updateik = true, updatepose = false,
 				matrix[MAT_Z] += lengthdir_z(value[e_value.CAM_ROTATE_DISTANCE], value[e_value.CAM_ROTATE_ANGLE_Z])
 			}
 			
+			// Apply only a world-space swing correction; keyframed local values stay intact.
+			if (type = e_tl_type.BODYPART && !value[e_value.RB_ENABLED] && (value[e_value.SECONDARY_ENABLED] || secondary_motion_active))
+			{
+				matrix = secondary_motion_update(id, matrix, [
+					value[e_value.SECONDARY_ENABLED],
+					value[e_value.SECONDARY_BLEND],
+					value[e_value.SECONDARY_FREQUENCY],
+					value[e_value.SECONDARY_DAMPING],
+					value[e_value.SECONDARY_INERTIA],
+					value[e_value.SECONDARY_GRAVITY],
+					value[e_value.SECONDARY_LIMIT],
+					value[e_value.SECONDARY_ANCHOR_X],
+					value[e_value.SECONDARY_ANCHOR_Y],
+					value[e_value.SECONDARY_ANCHOR_Z],
+					value[e_value.SECONDARY_TIP_X],
+					value[e_value.SECONDARY_TIP_Y],
+					value[e_value.SECONDARY_TIP_Z],
+					value[e_value.SECONDARY_WIND_X],
+					value[e_value.SECONDARY_WIND_Y],
+					value[e_value.SECONDARY_WIND_Z],
+					value[e_value.SECONDARY_MODE],
+					value[e_value.SECONDARY_STIFF_X],
+					value[e_value.SECONDARY_STIFF_Y],
+					value[e_value.SECONDARY_STIFF_Z],
+					value[e_value.SECONDARY_DAMP_X],
+					value[e_value.SECONDARY_DAMP_Y],
+					value[e_value.SECONDARY_DAMP_Z],
+					value[e_value.SECONDARY_TRAVEL_X],
+					value[e_value.SECONDARY_TRAVEL_Y],
+					value[e_value.SECONDARY_TRAVEL_Z]
+				], app.sm_preview && !app.timeline_playing && app.window_state == "" ? (current_time - app.sm_preview_start)/1000 : app.timeline_marker / max(0.001, app.project_tempo))
+				secondary_motion_active = value[e_value.SECONDARY_ENABLED] && value[e_value.SECONDARY_BLEND] > 0
+			}
+
+			rb_base_matrix = array_copy_1d(matrix)
+			rb_parent_matrix = array_copy_1d(matrix_parent)
+			if (!app.rb_capture && app.rb_session != 0 && (value[e_value.RB_ENABLED] || app.rb_cache_valid))
+				matrix = rigid_result(id, matrix, app.rb_session == 2 ? app.timeline_marker : -1)
 			// Set world position
 			world_pos = point3D(matrix[MAT_X], matrix[MAT_Y], matrix[MAT_Z])
 			

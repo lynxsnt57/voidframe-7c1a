@@ -3,12 +3,28 @@
 
 function action_tl_remove()
 {
+	// Model parts can be referenced by skin weights and can own child objects.
+	// Ask only for the original action, never while undoing or redoing it.
+	if (!history_undo && !history_redo)
+	{
+		var removing_part = false;
+		if (list_item_value != null && !list_item_value.selected)
+			removing_part = (list_item_value.part_of != null)
+		else
+		{
+			with (obj_timeline)
+				if (selected && part_of != null)
+					removing_part = true
+		}
+		if (removing_part && !show_question("Delete the selected model parts and their children? This may break the model or its animation. Save a backup first.\n\nContinue?"))
+			return 0
+	}
 	if (history_undo)
 	{
 		with (history_data)
 		{
 			for (var t = 0; t < tl_save_amount; t++)
-				history_restore_tl(tl_save_obj[t])
+				history_restore_tl(tl_save_obj[t], null, true)
 			history_restore_tl_select()
 		}
 	}
@@ -44,7 +60,7 @@ function action_tl_remove()
 		if (contexttl = null || contexttl.selected)
 		{
 			with (obj_timeline)
-				if (selected && part_of = null && !delete_ready)
+				if (selected && !delete_ready)
 					tl_remove_clean()
 			
 			tl_deselect_all()
@@ -52,7 +68,7 @@ function action_tl_remove()
 		else
 		{
 			with (contexttl)
-				if (part_of = null && !delete_ready)
+				if (!delete_ready)
 					tl_remove_clean()
 		}
 		

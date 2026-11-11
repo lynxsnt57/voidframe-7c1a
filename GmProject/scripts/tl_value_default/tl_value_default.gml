@@ -3,8 +3,105 @@
 
 function tl_value_default(valueid)
 {
+ if (valueid == e_value.GRAPH_KEY_MASK) return 511
+ if (valueid == e_value.GRAPH_ONLY || valueid == e_value.GRAPH_CHANNELS_USED) return 0
+ if (valueid >= e_value.GRAPH_POS_X_CYCLE && valueid <= e_value.GRAPH_SCA_Z_LIMIT_MAX)
+ {
+  var defaults = [0, 0, 1, 0, 0.05, 1, 0, 0, 120, 1, 10, 0, -180, 180];
+  return defaults[(valueid - e_value.GRAPH_POS_X_CYCLE) mod 14]
+ }
+
+	if (valueid >= e_value.GRAPH_POS_X_MODE && valueid <= e_value.GRAPH_SCA_Z_IN_Y)
+	{
+		var field = (valueid - e_value.GRAPH_POS_X_MODE) mod 5;
+		if (field = 1) return 1 / 3
+		if (field = 3) return 2 / 3
+		return 0
+	}
+
 	switch (valueid)
 	{
+		case e_value.SECONDARY_MODE: return 0
+		case e_value.SECONDARY_STIFF_X: return 1
+		case e_value.SECONDARY_STIFF_Y: return 1
+		case e_value.SECONDARY_STIFF_Z: return 1
+		case e_value.SECONDARY_DAMP_X: return 1
+		case e_value.SECONDARY_DAMP_Y: return 1
+		case e_value.SECONDARY_DAMP_Z: return 1
+		case e_value.SECONDARY_TRAVEL_X: return 0.5
+		case e_value.SECONDARY_TRAVEL_Y: return 0.5
+		case e_value.SECONDARY_TRAVEL_Z: return 0.5
+		case e_value.RB_ENABLED: return false
+		case e_value.RB_MODE: return 0
+		case e_value.RB_SHAPE: return 0
+		case e_value.RB_MASS: return 1
+		case e_value.RB_FRICTION: return 0.6
+		case e_value.RB_BOUNCE: return 0.05
+		case e_value.RB_LINEAR_DRAG: return 0.05
+		case e_value.RB_ANGULAR_DRAG: return 0.1
+		case e_value.RB_SIZE_X: return 16
+		case e_value.RB_SIZE_Y: return 16
+		case e_value.RB_SIZE_Z: return 16
+		case e_value.RB_OFFSET_X: return 0
+		case e_value.RB_OFFSET_Y: return 0
+		case e_value.RB_OFFSET_Z: return 0
+		case e_value.RB_JOINT: return 0
+		case e_value.RB_LIMIT_X: return 60
+		case e_value.RB_LIMIT_Y: return 60
+		case e_value.RB_LIMIT_Z: return 45
+		case e_value.RB_VEL_X: return 0
+		case e_value.RB_VEL_Y: return 0
+		case e_value.RB_VEL_Z: return 0
+		case e_value.RB_ANG_X: return 0
+		case e_value.RB_ANG_Y: return 0
+		case e_value.RB_ANG_Z: return 0
+		case e_value.RB_PARENT: return null
+		case e_value.RB_LAYER: return 0
+		case e_value.RB_MASK: return 255
+		case e_value.SECONDARY_ENABLED: return false
+		case e_value.SECONDARY_BLEND: return 1
+		case e_value.SECONDARY_FREQUENCY: return 2.5
+		case e_value.SECONDARY_DAMPING: return 0.7
+		case e_value.SECONDARY_INERTIA: return 1
+		case e_value.SECONDARY_GRAVITY: return 32
+		case e_value.SECONDARY_LIMIT: return 60
+		case e_value.SECONDARY_ANCHOR_X: return 0
+		case e_value.SECONDARY_ANCHOR_Y: return 0
+		case e_value.SECONDARY_ANCHOR_Z: return 0
+		case e_value.SECONDARY_TIP_X: return 0
+		case e_value.SECONDARY_TIP_Y: return 0
+		case e_value.SECONDARY_TIP_Z: return -8
+		case e_value.SECONDARY_WIND_X: return 0
+		case e_value.SECONDARY_WIND_Y: return 0
+		case e_value.SECONDARY_WIND_Z: return 0
+
+		case e_value.VOLUME_DENSITY: return 0.4
+		case e_value.VOLUME_SCATTERING: return 1
+		case e_value.VOLUME_ABSORPTION: return 0.35
+		case e_value.VOLUME_ANISOTROPY: return 0.25
+		case e_value.VOLUME_EDGE: return 0.15
+		case e_value.VOLUME_NOISE_AMOUNT: return 0.15
+		case e_value.VOLUME_NOISE_SCALE: return 3
+		case e_value.VOLUME_SAMPLES: return 32
+		case e_value.VOLUME_SHAPE: return 0
+		case e_value.VOLUME_PHASE: return 0
+		case e_value.VOLUME_GRADIENT: return false
+		case e_value.VOLUME_TOP_COLOR: return c_white
+		case e_value.VOLUME_EMISSION_COLOR: return c_white
+		case e_value.VOLUME_EMISSION: return 0
+		case e_value.VOLUME_NOISE_DETAIL: return 0
+		case e_value.VOLUME_NOISE_CONTRAST: return 1
+		case e_value.VOLUME_NOISE_THRESHOLD: return 0
+		case e_value.VOLUME_NOISE_SOFTNESS: return 0.25
+		case e_value.VOLUME_NOISE_SEED: return 0
+		case e_value.VOLUME_NOISE_WORLD: return false
+		case e_value.VOLUME_WIND_SPEED: return 0
+		case e_value.VOLUME_WIND_X: return 1
+		case e_value.VOLUME_WIND_Y: return 0
+		case e_value.VOLUME_WIND_Z: return 0
+		case e_value.VOLUME_WIND_INFLUENCE: return 1
+		case e_value.VOLUME_TURBULENCE: return 0
+		case e_value.VOLUME_TURBULENCE_SCALE: return 2.5
 		case e_value.SCA_X:
 		case e_value.SCA_Y:
 		case e_value.SCA_Z:
@@ -38,6 +135,20 @@ function tl_value_default(valueid)
 		case e_value.LIGHT_FADE_SIZE: return 0.5
 		case e_value.LIGHT_SPOT_RADIUS: return 50
 		case e_value.LIGHT_SPOT_SHARPNESS: return 0.5
+		case e_value.LIGHT_GOBO_ENABLED:
+		case e_value.LIGHT_GOBO_TILING: return true
+		case e_value.LIGHT_GOBO_INVERT: return false
+		case e_value.LIGHT_GOBO_INTENSITY: return 1
+		case e_value.LIGHT_GOBO_ROTATION:
+		case e_value.LIGHT_GOBO_SOFTNESS:
+		case e_value.LIGHT_GOBO_FEATHER:
+		case e_value.LIGHT_GOBO_SCROLL_X:
+		case e_value.LIGHT_GOBO_SCROLL_Y:
+		case e_value.LIGHT_GOBO_ROT_SPEED: return 0
+		case e_value.LIGHT_GOBO_OFFSET_X:
+		case e_value.LIGHT_GOBO_OFFSET_Y: return 0
+		case e_value.LIGHT_GOBO_REPEAT_X:
+		case e_value.LIGHT_GOBO_REPEAT_Y: return 1
 		case e_value.CAM_FOV: return 45
 		case e_value.CAM_CLIP_NEAR:
 		case e_value.CAM_EXPOSURE: return 1

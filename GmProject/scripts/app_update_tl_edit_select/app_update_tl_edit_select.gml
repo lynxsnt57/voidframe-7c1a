@@ -9,6 +9,7 @@ function app_update_tl_edit_select()
 		constraints.enabled = false
 		material.enabled = false
 		particles.enabled = false
+		volume.enabled = false
 		light.enabled = false
 		light.has_spotlight = false
 		camera.show = false
@@ -111,6 +112,9 @@ function app_update_tl_edit_select()
 		if (value_type[e_value_type.PARTICLES])
 			app.frame_editor.particles.enabled = true
 		
+		if (value_type[e_value_type.VOLUME])
+			app.frame_editor.volume.enabled = true
+
 		if (value_type[e_value_type.LIGHT]) {
 			app.frame_editor.light.enabled = true
 			app.timeline_editor.light.enabled = true

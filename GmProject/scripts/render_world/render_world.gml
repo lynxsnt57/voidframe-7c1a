@@ -35,6 +35,8 @@ function render_world(mode)
 		
 			if (tl.depth >= 0)
 				break
+            if (render_mode = e_render_mode.HIGH_LIGHT_POINT_DEPTH && tl = app.render_emitter_shadow_owner)
+                continue
 		
 			with (tl)
 				render_world_tl()
@@ -46,6 +48,8 @@ function render_world(mode)
 		
 			if (tl.depth >= 0)
 				break
+            if (render_mode = e_render_mode.HIGH_LIGHT_POINT_DEPTH && tl = app.render_emitter_shadow_owner)
+                continue
 		
 			with (tl)
 				render_world_tl_shadow()
@@ -69,12 +73,20 @@ function render_world(mode)
 	// Positive depth
 	if (!shadowdepthmode) {
 		for (; i < renderlistsize; i++)
-			with (render_list[|i])
-				render_world_tl()
+        {
+            tl = render_list[|i]
+            if (render_mode = e_render_mode.HIGH_LIGHT_POINT_DEPTH && tl = app.render_emitter_shadow_owner)
+                continue
+            with (tl) render_world_tl()
+        }
 	} else {
 		for (; i < renderlistsize; i++)
-			with (render_list[|i])
-				render_world_tl_shadow()
+        {
+            tl = render_list[|i]
+            if (render_mode = e_render_mode.HIGH_LIGHT_POINT_DEPTH && tl = app.render_emitter_shadow_owner)
+                continue
+            with (tl) render_world_tl_shadow()
+        }
 	}
 	
 	render_world_tl_reset()

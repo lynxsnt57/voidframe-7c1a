@@ -1,5 +1,6 @@
 #include "VertexBuffer.hpp"
 #include "Shader.hpp"
+#include <cmath>
 
 namespace CppProject
 {
@@ -309,8 +310,13 @@ namespace CppProject
 				VecType edge2 = { v3.x - v1.x, v3.y - v1.y, v3.z - v1.z };
 				VecType deltaUv1 = { v2.u - v1.u, v2.v - v1.v };
 				VecType deltaUv2 = { v3.u - v1.u, v3.v - v1.v };
-				RealType f = 1.0 / (deltaUv1.x * deltaUv2.y - deltaUv1.y * deltaUv2.x);
-				VecType t = ((edge1 * deltaUv2.y - edge2 * deltaUv1.y) * f).GetNormalized();
+				RealType determinant = deltaUv1.x * deltaUv2.y - deltaUv1.y * deltaUv2.x;
+				// Degenerate or missing UVs must not produce NaN/Inf tangents.
+				VecType t = edge1.GetNormalized();
+				if (std::isfinite(determinant) && std::abs(determinant) > 1e-12)
+					t = ((edge1 * deltaUv2.y - edge2 * deltaUv1.y) * (1.0 / determinant)).GetNormalized();
+				if (!std::isfinite(t.x) || !std::isfinite(t.y) || !std::isfinite(t.z) || t.GetLength() < 1e-12)
+					t = VecType(1.0, 0.0, 0.0);
 				v1.SetTangent(t.x, t.y, t.z);
 				v2.SetTangent(t.x, t.y, t.z);
 				v3.SetTangent(t.x, t.y, t.z);

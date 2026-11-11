@@ -39,6 +39,16 @@ function app_startup_interface_tabs()
 			tbx_render_engine_vanilla = new_textbox(true, 0, "")
 			tbx_render_engine_ex = new_textbox(true, 0, "")
 			tbx_render_distance = new_textbox_integer()
+			tbx_volume_resolution = new_textbox_decimals()
+			tbx_volume_quality = new_textbox_decimals()
+			tbx_volume_jitter = new_textbox_decimals()
+			tbx_volume_shadow_samples = new_textbox_integer()
+			tbx_volume_shadow_softness = new_textbox_decimals()
+			tbx_volume_near = new_textbox_integer()
+			tbx_volume_far = new_textbox_integer()
+			tbx_volume_resolution.suffix = "%"
+			tbx_volume_quality.suffix = "%"
+			tbx_volume_jitter.suffix = "%"
 			tbx_samples = new_textbox_integer()
 			
 			tbx_render_performance_mode_light_occlusion_distance = new_textbox_integer()
@@ -620,6 +630,23 @@ function app_startup_interface_tabs()
 			tbx_look_at_blend = new_textbox_integer()
 			tbx_look_at_blend.suffix = "%"
 			
+			// Secondary motion (body parts)
+			tbx_secondary_blend = new_textbox_ndecimals()
+			tbx_secondary_frequency = new_textbox_ndecimals()
+			tbx_secondary_damping = new_textbox_ndecimals()
+			tbx_secondary_inertia = new_textbox_ndecimals()
+			tbx_secondary_gravity = new_textbox_ndecimals()
+			tbx_secondary_limit = new_textbox_ndecimals()
+			tbx_secondary_anchor_x = new_textbox_ndecimals()
+			tbx_secondary_anchor_y = new_textbox_ndecimals()
+			tbx_secondary_anchor_z = new_textbox_ndecimals()
+			tbx_secondary_tip_x = new_textbox_ndecimals()
+			tbx_secondary_tip_y = new_textbox_ndecimals()
+			tbx_secondary_tip_z = new_textbox_ndecimals()
+			tbx_secondary_wind_x = new_textbox_ndecimals()
+			tbx_secondary_wind_y = new_textbox_ndecimals()
+			tbx_secondary_wind_z = new_textbox_ndecimals()
+
 			// Modifier
 			tbx_modifier_shake_position_power = new_textbox_decimals()
 			tbx_modifier_shake_position_power.suffix = "x"
@@ -685,6 +712,45 @@ function app_startup_interface_tabs()
 			tbx_force_vortex = new_textbox_ndecimals()
 		}
 		
+		// Separate Volume controls
+		volume = tab_add_category("frameeditorvolume", icons.CLOUD, tab_frame_editor_volume, false)
+		with (volume)
+		{
+			tbx_density = new_textbox_decimals()
+			tbx_density.suffix = "%"
+			tbx_scattering = new_textbox_decimals()
+			tbx_scattering.suffix = "%"
+			tbx_absorption = new_textbox_decimals()
+			tbx_absorption.suffix = "%"
+			tbx_anisotropy = new_textbox_decimals()
+			tbx_anisotropy.suffix = "%"
+			tbx_edge = new_textbox_decimals()
+			tbx_edge.suffix = "%"
+			tbx_noise = new_textbox_decimals()
+			tbx_noise.suffix = "%"
+			tbx_noise_scale = new_textbox_decimals()
+			tbx_emission = new_textbox_decimals()
+			tbx_emission.suffix = "%"
+			tbx_detail = new_textbox_decimals()
+			tbx_detail.suffix = "%"
+			tbx_contrast = new_textbox_decimals()
+			tbx_threshold = new_textbox_decimals()
+			tbx_threshold.suffix = "%"
+			tbx_softness = new_textbox_decimals()
+			tbx_softness.suffix = "%"
+			tbx_seed = new_textbox_ninteger()
+			tbx_wind_speed = new_textbox_ndecimals()
+			tbx_wind_x = new_textbox_ndecimals()
+			tbx_wind_y = new_textbox_ndecimals()
+			tbx_wind_z = new_textbox_ndecimals()
+			tbx_wind_influence = new_textbox_ndecimals()
+			tbx_wind_influence.suffix = "%"
+			tbx_turbulence = new_textbox_decimals()
+			tbx_turbulence.suffix = "%"
+			tbx_turbulence_scale = new_textbox_decimals()
+			tbx_samples = new_textbox_integer()
+		}
+
 		// Light
 		light = tab_add_category("frameeditorlight", icons.LIGHT_POINT_SMALL, tab_frame_editor_light, false)
 		with (light)
@@ -700,6 +766,20 @@ function app_startup_interface_tabs()
 			tbx_specular_strength.suffix = "%"
 			tbx_fade_size = new_textbox_integer()
 			tbx_fade_size.suffix = "%"
+			tbx_gobo_rotation = new_textbox_decimals()
+			tbx_gobo_intensity = new_textbox_decimals()
+			tbx_gobo_softness = new_textbox_decimals()
+			tbx_gobo_feather = new_textbox_decimals()
+			tbx_gobo_scroll_x = new_textbox_decimals()
+			tbx_gobo_scroll_y = new_textbox_decimals()
+			tbx_gobo_rot_speed = new_textbox_decimals()
+			tbx_gobo_intensity.suffix = "%"
+			tbx_gobo_softness.suffix = "%"
+			tbx_gobo_feather.suffix = "%"
+			tbx_gobo_offset_x = new_textbox_decimals()
+			tbx_gobo_offset_y = new_textbox_decimals()
+			tbx_gobo_repeat_x = new_textbox_decimals()
+			tbx_gobo_repeat_y = new_textbox_decimals()
 			tbx_spot_radius = new_textbox_decimals()
 			tbx_spot_sharpness = new_textbox_integer()
 			tbx_spot_sharpness.suffix = "%"

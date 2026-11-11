@@ -18,7 +18,9 @@ function tl_update_values(force = true)
 	// Find keyframes
 	for (var k = keyframe_list_index_prev; k < ds_list_size(keyframe_list); k++)
 	{
-		keyframe_next = keyframe_list[|k]
+		var candidate = keyframe_list[|k];
+		if (candidate.value[e_value.GRAPH_ONLY] > 0) continue
+		keyframe_next = candidate
 		if (keyframe_next.position > app.timeline_marker)
 			break
 		
@@ -58,6 +60,10 @@ function tl_update_values(force = true)
 	else
 		keyframe_progress_ease = ease(keyframe_transition, keyframe_progress)
 	
+	// Keep copied/inserted keyframe metadata in sync with the active segment.
+	for (var gv = e_value.GRAPH_POS_X_MODE; gv <= e_value.GRAPH_SCA_Z_IN_Y; gv++)
+		tl_update_values_ease(gv)
+
 	// Visible
 	tl_update_values_ease(e_value.VISIBLE)
 	
@@ -174,7 +180,15 @@ function tl_update_values(force = true)
 			tl_update_values_ease(e_value.COPY_ROT_Z)
 		}
 	}
+
+	// Secondary motion remains evaluable even on an otherwise static part.
+	if (type = e_tl_type.BODYPART)
+		for (var secondary_v = e_value.SECONDARY_ENABLED; secondary_v <= e_value.SECONDARY_WIND_Z; secondary_v++)
+			tl_update_values_ease(secondary_v)
 	
+	if (type = e_tl_type.BODYPART)
+		for (var sv2 = e_value.SECONDARY_MODE; sv2 <= e_value.SECONDARY_TRAVEL_Z; sv2++) tl_update_values_ease(sv2)
+	for (var rigid_v = e_value.RB_ENABLED; rigid_v <= e_value.RB_MASK; rigid_v++) tl_update_values_ease(rigid_v)
 	// Modifier
 	if (value_type[e_value_type.MODIFIER])
 	{
@@ -239,6 +253,38 @@ function tl_update_values(force = true)
 		tl_update_values_ease(e_value.FORCE_VORTEX)
 	}
 	
+	if (value_type[e_value_type.VOLUME])
+	{
+		tl_update_values_ease(e_value.LIGHT_COLOR)
+		tl_update_values_ease(e_value.VOLUME_DENSITY)
+		tl_update_values_ease(e_value.VOLUME_SCATTERING)
+		tl_update_values_ease(e_value.VOLUME_ABSORPTION)
+		tl_update_values_ease(e_value.VOLUME_ANISOTROPY)
+		tl_update_values_ease(e_value.VOLUME_EDGE)
+		tl_update_values_ease(e_value.VOLUME_NOISE_AMOUNT)
+		tl_update_values_ease(e_value.VOLUME_NOISE_SCALE)
+		tl_update_values_ease(e_value.VOLUME_SAMPLES)
+		tl_update_values_ease(e_value.VOLUME_SHAPE)
+		tl_update_values_ease(e_value.VOLUME_PHASE)
+		tl_update_values_ease(e_value.VOLUME_GRADIENT)
+		tl_update_values_ease(e_value.VOLUME_TOP_COLOR)
+		tl_update_values_ease(e_value.VOLUME_EMISSION_COLOR)
+		tl_update_values_ease(e_value.VOLUME_EMISSION)
+		tl_update_values_ease(e_value.VOLUME_NOISE_DETAIL)
+		tl_update_values_ease(e_value.VOLUME_NOISE_CONTRAST)
+		tl_update_values_ease(e_value.VOLUME_NOISE_THRESHOLD)
+		tl_update_values_ease(e_value.VOLUME_NOISE_SOFTNESS)
+		tl_update_values_ease(e_value.VOLUME_NOISE_SEED)
+		tl_update_values_ease(e_value.VOLUME_NOISE_WORLD)
+		tl_update_values_ease(e_value.VOLUME_WIND_SPEED)
+		tl_update_values_ease(e_value.VOLUME_WIND_X)
+		tl_update_values_ease(e_value.VOLUME_WIND_Y)
+		tl_update_values_ease(e_value.VOLUME_WIND_Z)
+		tl_update_values_ease(e_value.VOLUME_WIND_INFLUENCE)
+		tl_update_values_ease(e_value.VOLUME_TURBULENCE)
+		tl_update_values_ease(e_value.VOLUME_TURBULENCE_SCALE)
+	}
+
 	// Light
 	if (value_type[e_value_type.LIGHT])
 	{
@@ -255,6 +301,21 @@ function tl_update_values(force = true)
 		{
 			tl_update_values_ease(e_value.LIGHT_SPOT_RADIUS)
 			tl_update_values_ease(e_value.LIGHT_SPOT_SHARPNESS)
+			tl_update_values_ease(e_value.TEXTURE_OBJ)
+			tl_update_values_ease(e_value.LIGHT_GOBO_OFFSET_X)
+			tl_update_values_ease(e_value.LIGHT_GOBO_OFFSET_Y)
+			tl_update_values_ease(e_value.LIGHT_GOBO_REPEAT_X)
+			tl_update_values_ease(e_value.LIGHT_GOBO_REPEAT_Y)
+			tl_update_values_ease(e_value.LIGHT_GOBO_ENABLED)
+			tl_update_values_ease(e_value.LIGHT_GOBO_TILING)
+			tl_update_values_ease(e_value.LIGHT_GOBO_INVERT)
+			tl_update_values_ease(e_value.LIGHT_GOBO_ROTATION)
+			tl_update_values_ease(e_value.LIGHT_GOBO_INTENSITY)
+			tl_update_values_ease(e_value.LIGHT_GOBO_SOFTNESS)
+			tl_update_values_ease(e_value.LIGHT_GOBO_FEATHER)
+			tl_update_values_ease(e_value.LIGHT_GOBO_SCROLL_X)
+			tl_update_values_ease(e_value.LIGHT_GOBO_SCROLL_Y)
+			tl_update_values_ease(e_value.LIGHT_GOBO_ROT_SPEED)
 		}
 	}
 	
