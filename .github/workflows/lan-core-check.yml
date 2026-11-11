@@ -1,17 +1,20 @@
 name: LAN core checks
 on:
   push:
-    branches: [feature/lan-core-96d4b10]
+    branches: \[feature/lan-core-96d4b10\]
     paths:
-      - CppProject/Lan/**
-      - tools/lan-state-tests/**
+      - CppProject/Lan/\*\*
+      - tools/lan-state-tests/\*\*
       - .github/workflows/lan-core-check.yml
-  pull_request:
+  pull\_request:
     paths:
-      - CppProject/Lan/**
-      - tools/lan-state-tests/**
+      - CppProject/Lan/\*\*
+      - tools/lan-state-tests/\*\*
       - .github/workflows/lan-core-check.yml
-  workflow_dispatch:
+  workflow\_dispatch:
+concurrency:
+  group: lan-core-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -21,35 +24,36 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.ref\_name }}
       - name: Install Qt build dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends qtbase5-dev cmake ninja-build g++
-      - name: Restore source text and commit exact files
+          sudo apt-get install -y --no-install-recommends qtbase5-dev cmake ninja-build g++- name: Restore source text and commit exact files
         run: |
-          python3 - <<'PY'
+          python3 - &lt;&lt;'PY'
           from pathlib import Path
           import html
           for path in Path('CppProject/Lan').glob('*'):
               if path.suffix not in ('.cpp', '.hpp'):
                   continue
-              text = html.unescape(path.read_text())
-              text = text.replace('\\_', '_').replace('\\[', '[').replace('\\]', ']').replace('\\*', '*')
-              path.write_text(text)
-          test_source = Path('tools/lan-state-tests/main.cpp')
-          if test_source.exists():
-              test_source.rename(test_source.with_name('main.cpp.in'))
+              text = html.unescape(path.read\_text())
+              text = text.replace('\\', '').replace('\\\[', '\[').replace('\\\]', '\]').replace('\\*', '\*')
+              path.write\_text(text)
+          test\_source = Path('tools/lan-state-tests/main.cpp')
+          if test\_source.exists():
+              test\_source.rename(test\_source.with\_name('main.cpp.in'))
           PY
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name 'github-actions\[bot\]'
+          git config user.email '41898282+github-actions\[bot\]@users.noreply.github.com'
           git add CppProject/Lan tools/lan-state-tests
           if ! git diff --cached --quiet; then
             git commit -m 'fix(lan): normalize C++ sources and isolate test entry point'
-            git push origin HEAD:${GITHUB_REF_NAME}
+            git fetch origin ${GITHUB\_REF\_NAME}
+            git rebase origin/${GITHUB\_REF\_NAME}
+            git push origin HEAD:${GITHUB\_REF\_NAME}
           fi
       - name: Configure standalone authority tests
-        run: cmake -S tools/lan-state-tests -B build/lan-state-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S tools/lan-state-tests -B build/lan-state-tests -G Ninja -DCMAKE\_BUILD\_TYPE=Debug
       - name: Compile authority and tests
         run: cmake --build build/lan-state-tests --parallel 2
       - name: Test permissions and transaction invariants
