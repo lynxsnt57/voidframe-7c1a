@@ -37,12 +37,15 @@ jobs:
               text = html.unescape(path.read_text())
               text = text.replace('\\_', '_').replace('\\[', '[').replace('\\]', ']').replace('\\*', '*')
               path.write_text(text)
+          test_source = Path('tools/lan-state-tests/main.cpp')
+          if test_source.exists():
+              test_source.rename(test_source.with_name('main.cpp.in'))
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add CppProject/Lan tools/lan-state-tests
           if ! git diff --cached --quiet; then
-            git commit -m 'fix(lan): normalize exact C++ sources before build'
+            git commit -m 'fix(lan): normalize C++ sources and isolate test entry point'
             git push origin HEAD:${GITHUB_REF_NAME}
           fi
       - name: Configure standalone authority tests
