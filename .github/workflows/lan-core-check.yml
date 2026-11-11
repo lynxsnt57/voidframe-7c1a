@@ -1,19 +1,10 @@
 name: LAN core checks
 on:
   push:
-    branches: \[feature/lan-core-96d4b10\]
-    paths:
-      - CppProject/Lan/\*\*
-      - tools/lan-state-tests/\*\*
-      - .github/workflows/lan-core-check.yml
-  pull\_request:
-    paths:
-      - CppProject/Lan/\*\*
-      - tools/lan-state-tests/\*\*
-      - .github/workflows/lan-core-check.yml
-  workflow\_dispatch:
+    branches:
+      - feature/lan-core-96d4b10
 concurrency:
-  group: lan-core-${{ github.ref }}
+  group: lan-core-branch
   cancel-in-progress: true
 permissions:
   contents: write
@@ -23,38 +14,26 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ github.ref\_name }}
       - name: Install Qt build dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends qtbase5-dev cmake ninja-build g++- name: Restore source text and commit exact files
+          sudo apt-get install -y --no-install-recommends qtbase5-dev cmake ninja-build g++
+      - name: Restore source text and isolate tests
+        run: python3 tools/lan-state-tests/repair.py
+      - name: Commit repaired source files
         run: |
-          python3 - &lt;&lt;'PY'
-          from pathlib import Path
-          import html
-          for path in Path('CppProject/Lan').glob('*'):
-              if path.suffix not in ('.cpp', '.hpp'):
-                  continue
-              text = html.unescape(path.read\_text())
-              text = text.replace('\\', '').replace('\\\[', '\[').replace('\\\]', '\]').replace('\\*', '\*')
-              path.write\_text(text)
-          test\_source = Path('tools/lan-state-tests/main.cpp')
-          if test\_source.exists():
-              test\_source.rename(test\_source.with\_name('main.cpp.in'))
-          PY
-          git config user.name 'github-actions\[bot\]'
-          git config user.email '41898282+github-actions\[bot\]@users.noreply.github.com'
+          git config user.name 'LAN CI'
+          git config user.email 'lan-ci@example.invalid'
           git add CppProject/Lan tools/lan-state-tests
           if ! git diff --cached --quiet; then
-            git commit -m 'fix(lan): normalize C++ sources and isolate test entry point'
-            git fetch origin ${GITHUB\_REF\_NAME}
-            git rebase origin/${GITHUB\_REF\_NAME}
-            git push origin HEAD:${GITHUB\_REF\_NAME}
+            git commit -m 'fix(lan): normalize C++ source files for build'
+            git fetch origin feature/lan-core-96d4b10
+            git rebase origin/feature/lan-core-96d4b10
+            git push origin HEAD:refs/heads/feature/lan-core-96d4b10
           fi
-      - name: Configure standalone authority tests
-        run: cmake -S tools/lan-state-tests -B build/lan-state-tests -G Ninja -DCMAKE\_BUILD\_TYPE=Debug
+      - name: Configure LAN authority tests
+        run: cmake -S tools/lan-state-tests -B build/lan-tests -G Ninja
       - name: Compile authority and tests
-        run: cmake --build build/lan-state-tests --parallel 2
+        run: cmake --build build/lan-tests --parallel 2
       - name: Test permissions and transaction invariants
-        run: ctest --test-dir build/lan-state-tests --output-on-failure
+        run: ctest --test-dir build/lan-tests --output-on-failure
