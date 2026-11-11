@@ -3,83 +3,83 @@
 #include <cmath>
 #include <utility>
 namespace VoidframeLan {
-bool Grant::allows(const QString&amp; object,const QString&amp; p) const {
+bool Grant::allows(const QString& object,const QString& p) const {
     auto it=objects.constFind(object);
     return it==objects.cend()?global.contains(p):it.value().contains(p);
 }
-bool State::validId(const QString&amp; id) {
-    static const QRegularExpression r("^\[a-zA-Z0-9\_-\]{1,96}$");
+bool State::validId(const QString& id) {
+    static const QRegularExpression r("^[a-zA-Z0-9_-]{1,96}$");
     return r.match(id).hasMatch();
 }
-bool State::parseRevision(const QJsonValue&amp; v,quint64&amp; n) {
+bool State::parseRevision(const QJsonValue& v,quint64& n) {
     if(!v.isString()) return false;
     const QString s=v.toString();
-    if(s.isEmpty() || s.size()&gt;20 || (s.size()&gt;1 &amp;&amp; s\[0\]=='0')) return false;
-    for(QChar c:s) if(c&lt;'0'||c&gt;'9') return false;
-    bool ok=false; n=s.toULongLong(&amp;ok); return ok;
+    if(s.isEmpty() || s.size()>20 || (s.size()>1 && s[0]=='0')) return false;
+    for(QChar c:s) if(c<'0'||c>'9') return false;
+    bool ok=false; n=s.toULongLong(&ok); return ok;
 }
-bool State::number(const QJsonValue&amp; v) { return v.isDouble()&amp;&amp;std::isfinite(v.toDouble()); }
-bool State::boolean(const QJsonValue&amp; v) { return v.isBool(); }
-bool State::shortString(const QJsonValue&amp; v) { return v.isString()&amp;&amp;v.toString().size()&lt;=4096; }
-bool State::vector3(const QJsonValue&amp; v) {
+bool State::number(const QJsonValue& v) { return v.isDouble()&&std::isfinite(v.toDouble()); }
+bool State::boolean(const QJsonValue& v) { return v.isBool(); }
+bool State::shortString(const QJsonValue& v) { return v.isString()&&v.toString().size()<=4096; }
+bool State::vector3(const QJsonValue& v) {
     if(!v.isArray()||v.toArray().size()!=3) return false;
-    for(const auto&amp; x:v.toArray()) if(!number(x)||std::abs(x.toDouble())&gt;1e7) return false;
+    for(const auto& x:v.toArray()) if(!number(x)||std::abs(x.toDouble())>1e7) return false;
     return true;
 }
-bool State::finiteValue(const QJsonValue&amp; v,int depth) {
-    if(depth&gt;32||v.isUndefined()) return false;
+bool State::finiteValue(const QJsonValue& v,int depth) {
+    if(depth>32||v.isUndefined()) return false;
     if(v.isDouble()) return number(v);
-    if(v.isString()) return v.toString().size()&lt;=1024\*1024;
+    if(v.isString()) return v.toString().size()<=1024*1024;
     if(v.isArray()) {
-        const auto a=v.toArray(); if(a.size()&gt;100000) return false;
-        for(const auto&amp; x:a) if(!finiteValue(x,depth+1)) return false;
+        const auto a=v.toArray(); if(a.size()>100000) return false;
+        for(const auto& x:a) if(!finiteValue(x,depth+1)) return false;
     }
     if(v.isObject()) {
-        const auto o=v.toObject(); if(o.size()&gt;100000) return false;
-        for(auto i=o.begin();i!=o.end();++i) if(i.key().size()&gt;128||!finiteValue(i.value(),depth+1)) return false;
+        const auto o=v.toObject(); if(o.size()>100000) return false;
+        for(auto i=o.begin();i!=o.end();++i) if(i.key().size()>128||!finiteValue(i.value(),depth+1)) return false;
     }
     return true;
 }
-void State::registerKind(const QString&amp; k,const KindRule&amp; r) { schema\_\[k\]=r; }
-void State::setGraphValidator(GraphValidator v) { graph\_=std::move(v); }
-void State::setGrant(const QString&amp; actor,const Grant&amp; g) {
-    grants\_\[actor\]=g;
-    for(auto it=leases\_.begin();it!=leases\_.end();) {
-        if(it-&gt;actor==actor) it=leases\_.erase(it); else++it;
+void State::registerKind(const QString& k,const KindRule& r) { schema_[k]=r; }
+void State::setGraphValidator(GraphValidator v) { graph_=std::move(v); }
+void State::setGrant(const QString& actor,const Grant& g) {
+    grants_[actor]=g;
+    for(auto it=leases_.begin();it!=leases_.end();) {
+        if(it->actor==actor) it=leases_.erase(it); else++it;
     }
 }
-Grant State::grant(const QString&amp; a) const { return grants\_.value(a); }
-bool State::allowed(const QString&amp; a,const QString&amp; id,const QString&amp; p) const {
-    return a=="host" || (!p.isEmpty()&amp;&amp;grants\_.value(a).allows(id,p));
+Grant State::grant(const QString& a) const { return grants_.value(a); }
+bool State::allowed(const QString& a,const QString& id,const QString& p) const {
+    return a=="host" || (!p.isEmpty()&&grants_.value(a).allows(id,p));
 }
-void State::reset() { entities\_.clear();allocatedIds\_.clear();grants\_.clear();leases\_.clear();results\_.clear();order\_.clear();revision\_=0; }
-bool State::acquire(const QString&amp; actor,const QStringList&amp; ids,qint64 now,int duration,QString&amp; error) {
-    if(ids.isEmpty()||ids.size()&gt;MaxOperations||duration&lt;1000||duration&gt;15000) { error="Invalid lease request";return false; }
+void State::reset() { entities_.clear();allocatedIds_.clear();grants_.clear();leases_.clear();results_.clear();order_.clear();revision_=0; }
+bool State::acquire(const QString& actor,const QStringList& ids,qint64 now,int duration,QString& error) {
+    if(ids.isEmpty()||ids.size()>MaxOperations||duration<1000||duration>15000) { error="Invalid lease request";return false; }
     QSet<QString> unique;
-    for(const QString&amp; id:ids) {
-        if(unique.contains(id)||!entities\_.contains(id)) { error="Unknown/duplicate lease object";return false; }
+    for(const QString& id:ids) {
+        if(unique.contains(id)||!entities_.contains(id)) { error="Unknown/duplicate lease object";return false; }
         unique.insert(id);
-        const auto&amp; entity=entities\_\[id\]; const auto rule=schema\_.value(entity.kind);
+        const auto& entity=entities_[id]; const auto rule=schema_.value(entity.kind);
         bool canEdit=allowed(actor,id,rule.deletePermission);
-        for(auto f=rule.fields.begin();f!=rule.fields.end();++f) canEdit|=allowed(actor,id,f-&gt;permission);
+        for(auto f=rule.fields.begin();f!=rule.fields.end();++f) canEdit|=allowed(actor,id,f->permission);
         if(!canEdit) { error="Permission denied";return false; }
-        const auto lease=leases\_.value(id);
-        if(lease.expires&gt;now&amp;&amp;lease.actor!=actor) { error="Object is being edited by another participant";return false; }
+        const auto lease=leases_.value(id);
+        if(lease.expires>now&&lease.actor!=actor) { error="Object is being edited by another participant";return false; }
     }
-    for(const QString&amp; id:ids) leases\_\[id\]=Lease{actor,now+duration};
+    for(const QString& id:ids) leases_[id]=Lease{actor,now+duration};
     return true;
 }
-void State::release(const QString&amp; a,const QStringList&amp; ids) {
-    for(const QString&amp; id:ids) if(leases\_.value(id).actor==a) leases\_.remove(id);
+void State::release(const QString& a,const QStringList& ids) {
+    for(const QString& id:ids) if(leases_.value(id).actor==a) leases_.remove(id);
 }
-void State::disconnected(const QString&amp; a) {
-    for(auto it=leases\_.begin();it!=leases\_.end();) { if(it-&gt;actor==a) it=leases\_.erase(it);else++it; }
-    grants\_.remove(a);results\_.remove(a);order\_.remove(a);
+void State::disconnected(const QString& a) {
+    for(auto it=leases_.begin();it!=leases_.end();) { if(it->actor==a) it=leases_.erase(it);else++it; }
+    grants_.remove(a);results_.remove(a);order_.remove(a);
 }
 QJsonObject State::snapshot() const {
     QJsonObject entities;
-    for(auto i=entities\_.begin();i!=entities\_.end();++i) entities\[i.key()\]=QJsonObject{
-        {"kind",i-&gt;kind},{"revision",QString::number(i-&gt;revision)},{"fields",i-&gt;fields}};
-    return {{"revision",QString::number(revision\_)},{"entities",entities}};
+    for(auto i=entities_.begin();i!=entities_.end();++i) entities[i.key()]=QJsonObject{
+        {"kind",i->kind},{"revision",QString::number(i->revision)},{"fields",i->fields}};
+    return {{"revision",QString::number(revision_)},{"entities",entities}};
 }
 }
