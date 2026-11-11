@@ -4,7 +4,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Qt5 5.15 REQUIRED COMPONENTS Core)
-add_executable(voidframe_lan_state_tests main.cpp ../../CppProject/Lan/LanState.cpp)
+add_executable(voidframe_lan_state_tests main.cpp
+  ../../CppProject/Lan/LanState.cpp
+  ../../CppProject/Lan/LanTransactions.cpp)
 target_include_directories(voidframe_lan_state_tests PRIVATE ../../CppProject/Lan)
 target_link_libraries(voidframe_lan_state_tests PRIVATE Qt5::Core)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
