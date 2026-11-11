@@ -1,0 +1,253 @@
+/// block_load_model_file(filename, resource)
+/// @arg filename
+/// @arg [resource]
+
+function block_load_model_file(fname, res = null)
+{
+	if (res = null && !is_undefined(load_assets_model_file_map[?modworld_model_cache_key(fname)])) // Previously loaded
+		return load_assets_model_file_map[?modworld_model_cache_key(fname)]
+	
+	if (!file_exists_lib(fname))
+	{
+		log("Could not find model file", fname)
+		return null
+	}
+	
+	var typemap, map;
+	typemap = ds_int_map_create()
+	map = json_load(fname, typemap)
+	if (!ds_map_valid(map))
+	{
+		log("Could not parse model file", fname)
+		ds_map_destroy(typemap)
+		return null
+	}
+	
+	with (new_obj(obj_block_load_model_file))
+	{
+		name = filename_new_ext(filename_name(fname), "")
+		
+		// Parent
+		parent = null
+		if (res = null && is_string(map[?"parent"]))
+			parent = block_load_model_file(modworld_model_file_path(string_replace(map[?"parent"], "minecraft:", "")))
+		
+		// Textures
+		texture_map = null
+		if (is_real(map[?"textures"]))
+		{
+			var texmap = map[?"textures"];
+			texture_map = ds_map_create()
+			
+			// Array of models, fill map with the string IDs
+			if (ds_map_find_value(typemap[?map], "textures") = e_json_type.ARRAY && ds_list_valid(texmap))
+			{
+				for (var i = 0; i < ds_list_size(texmap); i++)
+				{
+					var texname;
+					if (ds_map_valid(texmap[?i]))
+						texname = ds_map_find_value(texmap[?i], "sprite")
+					else
+						texname = ds_list_find_value(texmap, i)
+					texname = string_replace(texname, "minecraft:", "")
+					
+					texture_map[?string(i)] = block_load_model_file_texture(texname, res)
+				}
+			}
+			
+			// Regular map, copy keys and values
+			else if (ds_map_valid(texmap))
+			{
+				var key = ds_map_find_first(texmap);
+				while (!is_undefined(key))
+				{
+					var texname;
+					if (ds_map_valid(texmap[?key]))
+						texname = ds_map_find_value(texmap[?key], "sprite")
+					else
+						texname = ds_map_find_value(texmap, key)
+					texname = string_replace(texname, "minecraft:", "")
+					
+					texture_map[?key] = block_load_model_file_texture(texname, res)
+					key = ds_map_find_next(texmap, key)
+				}
+			}
+		}
+		
+		// Element list
+		element_amount = 0
+		var elementslist = map[?"elements"];
+		if (!is_undefined(elementslist))
+		{
+			var sortsize, sizelist;
+			
+			if (ds_list_size(elementslist) > 0)
+			{
+				sortsize = true
+				sizelist = ds_list_create()
+			}
+			else
+			{
+				sortsize = false
+				sizelist = null
+			}
+			
+			for (var i = 0; i < ds_list_size(elementslist); i++)
+			{
+				with (new_obj(obj_block_load_element))
+				{
+					var elementmap = elementslist[|i];
+					
+					// From/To
+					from = value_get_point3D(elementmap[?"from"])
+					to = value_get_point3D(elementmap[?"to"])
+					size = point3D_sub(to, from)
+					volume = size[X] * size[Y] * size[Z]
+					light_emission = value_get_real(elementmap[?"light_emission"], 0)
+					
+					// Rotation
+					var rotationmap = elementmap[?"rotation"];
+					if (ds_map_valid(rotationmap))
+					{
+						var origin, rot, scale;
+						origin = value_get_point3D(rotationmap[?"origin"], point3D(8, 8, 8))
+						rot = vec3(0)
+						scale = vec3(1)
+						
+						if (is_string(rotationmap[?"axis"]) && is_real(rotationmap[?"angle"])) // Legacy single axis rotation
+						{
+							var angle = 0;
+							angle = rotationmap[?"angle"] //snap(clamp(rotationmap[?"angle"], -45, 45), 22.5)
+							
+							if (is_bool(rotationmap[?"rescale"]) && rotationmap[?"rescale"])
+								scale = vec3(1 / dcos(abs(angle)))
+							
+							switch (rotationmap[?"axis"])
+							{
+								case "x": rot[X] = angle; scale[X] = 1; break
+								case "z": rot[Y] = angle; scale[Y] = 1; break
+								case "y": rot[Z] = angle; scale[Z] = 1; break
+							}
+						}
+						else if (is_real(rotationmap[?"x"]) || is_real(rotationmap[?"y"]) || is_real(rotationmap[?"z"])) // New free rotation
+						{
+							var angles = [0, 0, 0];
+							
+							if (is_real(rotationmap[?"x"]))
+								angles[X] = rotationmap[?"x"]
+							if (is_real(rotationmap[?"y"]))
+								angles[Z] = rotationmap[?"y"]
+							if (is_real(rotationmap[?"z"]))
+								angles[Y] = rotationmap[?"z"]
+							
+							if (is_bool(rotationmap[?"rescale"]) && rotationmap[?"rescale"])
+							{
+								// TODO fix me
+								scale[X] = (1 / dcos(abs(angles[Y]))) * (1 / dcos(abs(angles[Z])))
+								scale[Y] = (1 / dcos(abs(angles[X]))) * (1 / dcos(abs(angles[Z])))
+								scale[Z] = (1 / dcos(abs(angles[X]))) * (1 / dcos(abs(angles[Y])))
+							}
+							
+							rot = angles
+						}
+						
+						matrix = matrix_create(point3D_mul(origin, -1), vec3(0), vec3(1))
+						matrix = matrix_multiply(matrix, matrix_create(point3D(0, 0, 0), vec3(0), scale))
+						matrix = matrix_multiply(matrix, matrix_create(point3D(0, 0, 0), [rot[X], 0, 0], vec3(1)))
+						matrix = matrix_multiply(matrix, matrix_create(point3D(0, 0, 0), [0, 0, rot[Z]], vec3(1)))
+						matrix = matrix_multiply(matrix, matrix_create(point3D(0, 0, 0), [0, rot[Y], 0], vec3(1)))
+						matrix = matrix_multiply(matrix, matrix_create(origin, vec3(0), vec3(1)))
+						rotated = true
+					}
+					else
+						rotated = false
+					
+					// Faces
+					var facesmap = elementmap[?"faces"]
+					for (var f = 0; f < e_dir.amount; f++)
+					{
+						var curmap = facesmap[?dir_get_string(f)];
+						if (!is_undefined(curmap))
+						{
+							face_render[f] = true
+							
+							// UV
+							face_has_uv[f] = false
+							if (ds_list_valid(curmap[?"uv"]))
+							{
+								var uvlist = curmap[?"uv"];
+								face_uv_from[f] = point2D(uvlist[|0], uvlist[|1])
+								face_uv_to[f] = point2D(uvlist[|2], uvlist[|3])
+								face_has_uv[f] = true
+								
+								// Limit to between 0 and 16
+								var uvfrom, uvto;
+								uvfrom = face_uv_from[f]
+								uvto = face_uv_to[f]
+								face_uv_from[f] = vec2(mod_fix(uvfrom[X], block_size + 0.1), mod_fix(uvfrom[Y], block_size + 0.1))
+								face_uv_to[f] = vec2(mod_fix(uvto[X], block_size + 0.1), mod_fix(uvto[Y], block_size + 0.1))
+							}
+							
+							// Texture
+							face_texture[f] = curmap[?"texture"]
+							
+							// Optional tint for imported furniture sprites
+							face_custom_color[f] = -1
+							if (is_real(curmap[?"mineimator_color"]))
+								face_custom_color[f] = curmap[?"mineimator_color"]
+
+							// Imported furniture atlases can contain different material types.
+							face_custom_depth[f] = -1
+							if (is_string(curmap[?"mineimator_render_type"]))
+							{
+								switch (curmap[?"mineimator_render_type"])
+								{
+									case "SOLID": face_custom_depth[f] = e_block_depth.DEPTH0; break;
+									case "CUTOUT":
+									case "CUTOUT_MIPPED": face_custom_depth[f] = e_block_depth.DEPTH1; break;
+									case "TRANSLUCENT": face_custom_depth[f] = e_block_depth.DEPTH2; break;
+								}
+							}
+
+							// Rotation
+							face_rotation[f] = 0
+							if (is_real(curmap[?"rotation"]))
+								face_rotation[f] = curmap[?"rotation"]
+						}
+						else
+							face_render[f] = false
+					}
+					
+					if (sortsize)
+					{
+						var pos;
+						for (pos = 0; pos < ds_list_size(sizelist); pos++)
+							if (sizelist[|pos].volume > volume)
+								break
+						
+						ds_list_insert(sizelist, pos, id)
+						
+						other.element_amount++
+					}
+					else
+					{
+						other.element[other.element_amount++] = id
+					}
+				}
+			}
+			
+			if (sortsize)
+			{
+				element = ds_list_create_array(sizelist)
+				ds_list_destroy(sizelist)
+			}
+		}
+		
+		if (res = null)
+			load_assets_model_file_map[?modworld_model_cache_key(fname)] = id
+		
+		ds_map_destroy(map)
+		
+		return id
+	}
+}

@@ -1,0 +1,106 @@
+/// project_save_render()
+
+function project_save_render()
+{
+	json_save_object_start("render")
+		
+		json_save_var("render_engine", project_render_engine)
+		json_save_var("render_samples", project_render_samples)
+		json_save_var("render_distance", project_render_distance)
+		
+		json_save_var_bool("render_legacy_rendering", project_render_legacy_rendering)
+		
+		json_save_var_bool("render_performance_mode", project_render_performance_mode)
+		json_save_var_bool("render_performance_mode_skipfog", project_render_performance_mode_skipfog)
+		json_save_var_bool("render_performance_mode_skipsky", project_render_performance_mode_skipsky)
+		json_save_var("render_performance_mode_light_occlusion_distance", project_render_performance_mode_light_occlusion_distance)
+		
+		json_save_var_bool("render_ssao", project_render_ssao)
+		json_save_var("render_ssao_samples", project_render_ssao_samples)
+		json_save_var("render_ssao_radius", project_render_ssao_radius)
+		json_save_var("render_ssao_power", project_render_ssao_power)
+		json_save_var_color("render_ssao_color", project_render_ssao_color)
+		json_save_var("render_ssao_ratio", project_render_ssao_ratio)
+		json_save_var("render_ssao_ratio_balance", project_render_ssao_ratio_balance)
+		
+		json_save_var_bool("render_shadows", project_render_shadows)
+		json_save_var("render_shadows_sun_buffer_size", project_render_shadows_sun_buffer_size)
+		json_save_var("render_shadows_spot_buffer_size", project_render_shadows_spot_buffer_size)
+		json_save_var("render_shadows_point_buffer_size", project_render_shadows_point_buffer_size)
+		json_save_var("render_shadows_transparent", project_render_shadows_transparent)
+		json_save_var("render_shadows_blur_sample", project_render_shadows_blur_sample)
+		json_save_var("render_shadows_blur", project_render_shadows_blur)
+		json_save_var("render_shadows_bias", project_render_shadows_bias)
+		
+		json_save_var_bool("render_subsurface_quality", project_render_subsurface_quality)
+		json_save_var("render_subsurface_samples", project_render_subsurface_samples)
+		json_save_var("render_subsurface_sharpness", project_render_subsurface_sharpness)
+		json_save_var("render_subsurface_strength", project_render_subsurface_strength)
+		json_save_var("render_subsurface_absorption", project_render_subsurface_absorption)
+		json_save_var("render_subsurface_desaturation", project_render_subsurface_desaturation)
+		json_save_var("render_subsurface_colorthreshold", project_render_subsurface_colorthreshold)
+		json_save_var("render_subsurface_highlight", project_render_subsurface_highlight)
+		json_save_var("render_subsurface_highlight_strength", project_render_subsurface_highlight_strength)
+		json_save_var("render_subsurface_highlight_sharpness", project_render_subsurface_highlight_sharpness)
+		json_save_var("render_subsurface_highlight_colorthreshold", project_render_subsurface_highlight_colorthreshold)
+		
+		json_save_var_bool("render_indirect", project_render_indirect)
+		json_save_var("render_indirect_precision", project_render_indirect_precision)
+		json_save_var("render_indirect_blur_radius", project_render_indirect_blur_radius)
+		json_save_var("render_indirect_strength", project_render_indirect_strength)
+		json_save_var("render_indirect_raystep", project_render_indirect_raystep)
+		json_save_var_bool("render_indirect_denoiser", project_render_indirect_denoiser)
+		json_save_var("render_indirect_denoiser_strength", project_render_indirect_denoiser_strength)
+		
+		json_save_var_bool("render_reflections", project_render_reflections)
+		json_save_var("render_reflections_precision", project_render_reflections_precision)
+		json_save_var("render_reflections_thickness", project_render_reflections_thickness)
+		json_save_var("render_reflections_fade_amount", project_render_reflections_fade_amount)
+		
+		json_save_var_bool("render_glow", project_render_glow)
+		json_save_var("render_glow_radius", project_render_glow_radius)
+		json_save_var("render_glow_intensity", project_render_glow_intensity)
+		json_save_var_bool("render_glow_falloff", project_render_glow_falloff)
+		json_save_var("render_glow_falloff_radius", project_render_glow_falloff_radius)
+		json_save_var("render_glow_falloff_intensity", project_render_glow_falloff_intensity)
+		json_save_var("render_glow_blend_mode", project_render_glow_blend_mode)
+		
+		json_save_var_bool("render_aa", project_render_aa)
+		json_save_var("render_aa_power", project_render_aa_power)
+		json_save_var_bool("render_smaa", project_render_smaa)
+		json_save_var("render_smaa_power", project_render_smaa_power)
+		
+		json_save_var("render_dof_sample", project_render_dof_sample)
+		json_save_var_bool("render_dof_ghostingfix", project_render_dof_ghostingfix)
+		json_save_var("render_dof_ghostingfix_threshold", project_render_dof_ghostingfix_threshold)
+		json_save_var_bool("render_dof_affect_glow", project_render_dof_affect_glow)
+		json_save_var("render_godray_step",	project_render_godray_step)
+		
+		json_save_var_bool("render_motionblur", project_render_motionblur)
+		json_save_var("render_motionblur_power", project_render_motionblur_power)
+		
+		json_save_var("render_buffer_scale", project_render_buffer_scale)
+		
+		json_save_var("bend_style", project_bend_style)
+		json_save_var_bool("opaque_leaves", project_render_opaque_leaves)
+		json_save_var_bool("liquid_animation", project_render_liquid_animation)
+		json_save_var_bool("water_reflections", project_render_water_reflections)
+		
+		json_save_var("block_emissive", project_render_block_emissive)
+		json_save_var("block_subsurface", project_render_block_subsurface)
+		
+		json_save_var("glint_speed", project_render_glint_speed)
+		json_save_var("glint_strength", project_render_glint_strength)
+		
+		json_save_var_bool("texture_filtering", project_render_texture_filtering)
+		json_save_var_bool("transparent_block_texture_filtering", project_render_transparent_block_texture_filtering)
+		json_save_var("texture_filtering_level", project_render_texture_filtering_level)
+		
+		json_save_var("render_alpha_mode", project_render_alpha_mode)
+		json_save_var("tonemapper", project_render_tonemapper)
+		json_save_var("exposure", project_render_exposure)
+		json_save_var("gamma", project_render_gamma)
+		json_save_var_bool("material_maps", project_render_material_maps)
+		
+	json_save_object_done()
+}

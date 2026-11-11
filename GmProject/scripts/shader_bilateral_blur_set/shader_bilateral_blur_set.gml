@@ -1,0 +1,17 @@
+/// shader_high_indirect_blur_set
+
+function shader_bilateral_blur_set(surface) {
+	texture_set_stage(sampler_map[?"uIndirectTex"], surface_get_texture(surface));
+	texture_set_stage(sampler_map[?"uDepthBuffer"], surface_get_texture(render_surface_depth));
+	texture_set_stage(sampler_map[?"uNormalBuffer"], surface_get_texture(render_surface_normal));
+	
+	gpu_set_texrepeat_ext(sampler_map[?"uIndirectTex"], false);
+	gpu_set_texrepeat_ext(sampler_map[?"uDepthBuffer"], false);
+	gpu_set_texrepeat_ext(sampler_map[?"uNormalBuffer"], false);
+
+	render_set_uniform("uDepthSigma", 120.0);
+	render_set_uniform("uNormalSigma", 32.0);
+	render_set_uniform("uBilateralRadius", app.project_render_indirect_denoiser_strength * 0.021 * (render_height / 480.0) * random_range(0.75, 1.25));
+	render_set_uniform("uNormalBufferScale", is_cpp() ? normal_buffer_scale : 1);
+	render_set_uniform_vec2("uScreenSize", render_width, render_height);
+}
