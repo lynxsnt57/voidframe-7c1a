@@ -4,7 +4,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Qt5 5.15 REQUIRED COMPONENTS Core)
-add_executable(voidframe_lan_state_tests main.cpp
+configure_file(main.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/main.cpp COPYONLY)
+add_executable(voidframe_lan_state_tests ${CMAKE_CURRENT_BINARY_DIR}/main.cpp
   ../../CppProject/Lan/LanState.cpp
   ../../CppProject/Lan/LanTransactions.cpp)
 target_include_directories(voidframe_lan_state_tests PRIVATE ../../CppProject/Lan)
