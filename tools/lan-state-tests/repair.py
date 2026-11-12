@@ -1,15 +1,17 @@
-import html
+import base64
+import hashlib
+import json
+import zlib
 from pathlib import Path
-for path in Path('CppProject/Lan').iterdir():
-    if path.suffix != '.cpp' and path.suffix != '.hpp':
-        continue
-    text = open(path, encoding='utf-8').read()
-    text = html.unescape(text)
-    text = text.replace(chr(92) + chr(95), chr(95))
-    text = text.replace(chr(92) + chr(91), chr(91))
-    text = text.replace(chr(92) + chr(93), chr(93))
-    text = text.replace(chr(92) + chr(42), chr(42))
-    open(path, 'w', encoding='utf-8').write(text)
-test = Path('tools/lan-state-tests/main.cpp')
-if test.exists():
-    test.rename(test.with_name('main.cpp.in'))
+spec = json.loads(zlib.decompress(base64.b64decode(Path('tools/lan-state-tests/session-restore.b64').read_bytes())))
+path = Path('CppProject/Lan/LanSession.cpp')
+text = path.read_text()
+digest = hashlib.sha256(text.encode()).hexdigest()
+if digest != spec.get('after'):
+    if digest != spec.get('before'):
+        raise RuntimeError('Unexpected source revision; refusing to overwrite edits')
+    for start, end, value in reversed(spec.get('ops')):
+        text = text[:start] + value + text[end:]
+    if hashlib.sha256(text.encode()).hexdigest() != spec.get('after'):
+        raise RuntimeError('Source integrity check failed')
+    path.write_text(text)
