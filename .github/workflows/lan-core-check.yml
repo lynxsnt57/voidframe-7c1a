@@ -7,20 +7,15 @@ concurrency:
   group: lan-core-branch
   cancel-in-progress: true
 permissions:
-  contents: write
+  contents: read
 jobs:
   core:
     runs-on: ubuntu-22.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Restore exact guarded editor header bytes
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo 'd2f0e5d067e6b02e51a678f3176604801429f205feeca6d8bafbb7ff3ce3258e  CppProject/Lan/LanEditorBridge.hpp' | sha256sum --check
-          echo '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' | base64 --decode | gzip --decompress | tee CppProject/Lan/LanEditorBridge.hpp
-          echo '5cce0b5eca8190bc11ad87519f70572a5ea023e525b5e7a27cf74b767856cbbb  CppProject/Lan/LanEditorBridge.hpp' | sha256sum --check
+        with:
+          persist-credentials: false
       - name: Install Qt build dependencies
         run: |
           sudo apt-get update -qq
@@ -31,10 +26,3 @@ jobs:
         run: cmake --build build/lan-tests --parallel 2
       - name: Test authority, loopback and editor boundary
         run: ctest --test-dir build/lan-tests --output-on-failure
-      - name: Commit exact tested source bytes
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add CppProject/Lan/LanEditorBridge.hpp
-          git commit -m 'fix(lan): preserve exact editor bridge source bytes'
-          git push origin HEAD:feature/lan-core-96d4b10
