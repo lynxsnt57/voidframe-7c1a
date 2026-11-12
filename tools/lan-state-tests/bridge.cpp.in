@@ -1,0 +1,52 @@
+#include "LanEditorBridge.hpp"
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QThread>
+#include <QTextStream>
+#include <cstdio>
+#include <stdexcept>
+using namespace VoidframeLan;
+namespace {
+void require(bool ok,const char* message){if(!ok)throw std::runtime_error(message);}
+bool waitFor(const std::function<bool()>& f){
+    QElapsedTimer timer;timer.start();
+    while(timer.elapsed()<4000){QCoreApplication::processEvents(QEventLoop::AllEvents,10);if(f())return true;QThread::msleep(1);}return f();
+}
+void tests(){
+    Session host("bridge-build");KindRule rule;
+    rule.createPermission="create";rule.deletePermission="delete";
+    rule.fields["name"]={"rename",State::shortString,false};
+    host.authority().registerKind("object",rule);QString error;
+    require(host.host(QHostAddress::LocalHost,0,error),"host starts");
+    QJsonObject op{{"op","create"},{"entity","body"},{"kind","object"},{"expected","0"},{"fields",QJsonObject{{"name","Before"}}}};
+    require(host.hostTransaction({{"request","create"},{"ops",QJsonArray{op}}}).accepted,"seed source");
+    EditorBridge bridge("bridge-build");int applied=0;bool reject=false;
+    bridge.applyProject=[&](const QJsonObject&,QString& e){
+        if(reject){e="Test adapter rejected the batch without mutation";return false;}
+        applied++;return true;
+    };
+    require(bridge.transport().join("127.0.0.1",host.port(),"Editor",host.invitationCode(),error),"bridge joins");
+    require(waitFor([&]{return bridge.transport().connected()&&bridge.pendingEvents()>0;}),"events queued");
+    require(applied==0&&!bridge.canonical().ready(),"socket callbacks never mutate editor or canonical mirror");
+    require(bridge.drain(true,error)==0&&applied==0,"busy editor does not apply events");
+    require(waitFor([&]{bridge.drain(false,error);return bridge.editable();}),"snapshot applied at safe boundary");
+    require(applied==1&&bridge.canonical().revision()==1,"initial project batch applied once");
+    op={{"op","set"},{"entity","body"},{"expected","1"},{"field","name"},{"value","After"}};
+    require(host.hostTransaction({{"request","rename"},{"ops",QJsonArray{op}}}).accepted,"host edit committed");
+    require(waitFor([&]{return bridge.pendingEvents()>0;}),"commit queued");
+    require(applied==1&&bridge.canonical().revision()==1,"pending commit does not modify editor");
+    require(waitFor([&]{bridge.drain(false,error,1);return bridge.canonical().revision()==2;}),"bounded draining applies commit");
+    require(applied==2,"one project callback per committed batch");
+    op["expected"]="2";op["value"]="MustNotApply";reject=true;
+    require(host.hostTransaction({{"request","reject"},{"ops",QJsonArray{op}}}).accepted,"third host revision");
+    require(waitFor([&]{bridge.drain(false,error);return !bridge.transport().connected();}),"codec failure closes session safely");
+    require(applied==2&&!bridge.editable()&&!error.isEmpty(),"failed project apply never enables further edits");
+    bridge.stop();host.close();
+}
+}
+int main(int argc,char** argv){
+    QCoreApplication app(argc,argv);
+    try{tests();QTextStream(stdout)<<"PASS: queued editor application, busy gating and fail-closed adapter\n";return 0;}
+    catch(const std::exception& e){QTextStream(stderr)<<"FAIL: "<<e.what()<<'\n';return 1;}
+}
