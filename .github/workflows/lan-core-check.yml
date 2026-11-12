@@ -7,33 +7,22 @@ concurrency:
   group: lan-core-branch
   cancel-in-progress: true
 permissions:
-  contents: write
+  contents: read
 jobs:
-  authority:
+  core:
     runs-on: ubuntu-22.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Install Qt build dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends qtbase5-dev cmake ninja-build g++
-      - name: Restore source text and isolate tests
-        run: python3 tools/lan-state-tests/repair.py
-      - name: Commit repaired source files
-        run: |
-          git config user.name 'LAN CI'
-          git config user.email 'lan-ci@example.invalid'
-          git add CppProject/Lan tools/lan-state-tests
-          if ! git diff --cached --quiet; then
-            git commit -m 'fix(lan): normalize C++ source files for build'
-            git fetch origin feature/lan-core-96d4b10
-            git rebase origin/feature/lan-core-96d4b10
-            git push origin HEAD:refs/heads/feature/lan-core-96d4b10
-          fi
-      - name: Configure LAN authority tests
+      - name: Configure LAN core tests
         run: cmake -S tools/lan-state-tests -B build/lan-tests -G Ninja
-      - name: Compile authority and tests
+      - name: Compile core and tests
         run: cmake --build build/lan-tests --parallel 2
-      - name: Test permissions and transaction invariants
+      - name: Test authority, loopback and editor boundary
         run: ctest --test-dir build/lan-tests --output-on-failure
