@@ -1,0 +1,108 @@
+#include "LanSession.hpp"
+#include "LanReplica.hpp"
+#include "LanPresence.hpp"
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QThread>
+#include <QTextStream>
+#include <cstdio>
+#include <stdexcept>
+#include <cmath>
+using namespace VoidframeLan;
+namespace {
+void require(bool ok,const char* text){if(!ok)throw std::runtime_error(text);}
+bool waitFor(const std::function<bool()>& f,int timeout=4000){
+    QElapsedTimer t;t.start();
+    while(t.elapsed()<timeout){QCoreApplication::processEvents(QEventLoop::AllEvents,10);if(f())return true;QThread::msleep(1);}return f();
+}
+KindRule rule(){
+    KindRule r;r.createPermission="objects.create";r.deletePermission="objects.delete";
+    r.fields["position"]={"objects.transform",State::vector3,false};
+    r.fields["name"]={"objects.properties",State::shortString,false};return r;
+}
+Grant edit(){Grant g;g.global={"objects.create","objects.delete","objects.transform","objects.properties","resources.publish"};return g;}
+QJsonObject create(){
+    QJsonObject op{{"op","create"},{"entity","body"},{"kind","timeline"},{"expected","0"},{"fields",QJsonObject{{"position",QJsonArray{0,0,0}},{"name","Test"}}}};
+    return {{"request","create"},{"ops",QJsonArray{op}}};
+}
+QJsonObject move(){
+    QJsonObject op{{"op","set"},{"entity","body"},{"expected","1"},{"field","position"},{"value",QJsonArray{10,20,30}}};
+    return {{"request","network_move"},{"ops",QJsonArray{op}}};
+}
+void presenceTests(){
+    Presence p;QJsonObject pose{{"position",QJsonArray{1,2,3}},{"rotation",QJsonArray{0,0,0,1}},{"fov",60}};
+    require(p.update("peer",pose,0),"presence accepted");CameraPose camera;
+    require(p.sample("peer",0,camera),"initial camera pose");
+    pose["position"]=QJsonArray{11,2,3};
+    require(p.update("peer",pose,100)&&p.sample("peer",150,camera),"presence sample");
+    require(std::abs(camera.position.x()-6)<.001,"camera interpolation midpoint");
+    require(Presence::drone(camera,0).size()==88,"mini-drone geometry");
+    require(!p.sample("peer",6000,camera),"stale camera expires");
+    pose["rotation"]=QJsonArray{0,0,0,0};require(!p.update("peer",pose,6001),"invalid rotation rejected");
+}
+void networkTests(){
+    Session host("test-build"),a("test-build"),wrong("test-build"),incompatible("other-build");
+    host.authority().registerKind("timeline",rule());QString error;
+    require(host.host(QHostAddress::LocalHost,0,error),"host listens");
+    require(host.hostTransaction(create()).accepted,"host initial state");
+    Replica mirror;bool snapshot=false,lease=false,wrongClosed=false,incompatibleClosed=false;
+    int commits=0,accepted=0,rejected=0;QString peer;int poses=0;
+    host.onEvent=[&](const QJsonObject& e){if(e["type"].toString()=="joined")peer=e["peer"].toString();};
+    a.onEvent=[&](const QJsonObject& e){
+        const QString type=e["type"].toString();
+        if(type=="snapshot"){require(mirror.consume(e,error),"snapshot valid");snapshot=true;}
+        if(type=="commit"){require(mirror.consume(e,error),"commit valid");commits++;}
+        if(type=="lease.result")lease=e["accepted"].toBool();
+        if(type=="result"){if(e["accepted"].toBool())accepted++;else rejected++;}
+        if(type=="presence")poses++;
+    };
+    require(a.join("127.0.0.1",host.port(),"Alice",host.invitationCode(),error),"join started");
+    require(waitFor([&]{return snapshot&&!peer.isEmpty();}),"authenticated initial sync");
+    require(mirror.snapshot()==host.authority().snapshot(),"initial convergence");
+    require(a.submit(move()),"read-only transaction sent");
+    require(waitFor([&]{return rejected==1;})&&host.authority().revision()==1,"new participant is read-only");
+    wrong.onEvent=[&](const QJsonObject& e){if(e["type"].toString()=="left")wrongClosed=true;};
+    incompatible.onEvent=[&](const QJsonObject& e){if(e["type"].toString()=="left")incompatibleClosed=true;};
+    require(wrong.join("127.0.0.1",host.port(),"Wrong",QString::fromLatin1(QByteArray(32,'x').toBase64()),error),"bad-code connection started");
+    require(incompatible.join("127.0.0.1",host.port(),"WrongBuild",host.invitationCode(),error),"incompatible connection started");
+    require(waitFor([&]{return host.members().size()==2&&wrongClosed&&incompatibleClosed;}),"unauthorized peers rejected");
+    host.setGrant(peer,edit());require(a.acquire({"body"}),"lease request sent");
+    require(waitFor([&]{return lease;}),"lease acknowledged");
+    require(a.submit(move()),"allowed transaction sent");
+    require(waitFor([&]{return commits==1&&accepted==1;}),"host commit delivered");
+    require(mirror.snapshot()==host.authority().snapshot(),"replicas converge");
+    require(a.submit(move()),"retry sent");
+    require(waitFor([&]{return accepted==2;})&&commits==1,"retry never duplicates commit");
+    QJsonObject duplicate{{"type","commit"},{"revision","2"},{"changes",QJsonArray()}};
+    require(!mirror.consume(duplicate,error)&&mirror.revision()==2,"duplicate or gap rejected atomically");
+    QJsonObject pose{{"position",QJsonArray{1,2,3}},{"rotation",QJsonArray{0,0,0,1}},{"fov",60}};
+    require(host.publishPresence(pose)&&waitFor([&]{return poses>0;}),"host camera reaches client");
+    QByteArray data(65536,'z');QString hash=QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex());
+    require(a.uploadBlock(data),"resource upload sent");
+    require(waitFor([&]{return host.cachedBlock(hash)==data;}),"resource hash verified on host");
+    require(a.requestBlock(hash),"resource download sent");
+    require(waitFor([&]{return a.cachedBlock(hash)==data;}),"resource download verified");
+    host.setGrant(peer,Grant());
+    QByteArray denied(3,'x');QString deniedHash=QString::fromLatin1(QCryptographicHash::hash(denied,QCryptographicHash::Sha256).toHex());
+    require(a.uploadBlock(denied),"revoked upload reaches host");
+    waitFor([&]{return false;},100);
+    require(host.cachedBlock(deniedHash).isEmpty(),"revoked upload denied");
+    a.close();require(waitFor([&]{return host.members().size()==1;}),"disconnect removes peer");
+    mirror.reset();snapshot=false;QString oldPeer=peer;
+    require(a.join("127.0.0.1",host.port(),"Alice",host.invitationCode(),error),"reconnect starts");
+    require(waitFor([&]{return snapshot&&peer!=oldPeer;}),"reconnect gets fresh snapshot and identity");
+    require(mirror.snapshot()==host.authority().snapshot(),"reconnect convergence");
+    require(host.authority().grant(peer).global.isEmpty(),"reconnect never restores revoked rights implicitly");
+    a.close();waitFor([&]{return host.members().size()==1;});
+    require(host.cachedBlock("../escape").isEmpty(),"path traversal denied");
+    host.close();require(host.cachedBlock(hash).isEmpty(),"cache cleared between sessions");
+    host.onEvent={};a.onEvent={};wrong.onEvent={};incompatible.onEvent={};
+}
+}
+int main(int argc,char** argv){
+    QCoreApplication app(argc,argv);
+    try{presenceTests();networkTests();QTextStream(stdout)<<"PASS: camera presence, authenticated loopback, ACLs, assets, retry and reconnect\n";return 0;}
+    catch(const std::exception& e){QTextStream(stderr)<<"FAIL: "<<e.what()<<'\n';return 1;}
+}
