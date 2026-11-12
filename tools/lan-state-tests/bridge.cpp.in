@@ -13,6 +13,31 @@ bool waitFor(const std::function<bool()>& f){
     QElapsedTimer timer;timer.start();
     while(timer.elapsed()<4000){QCoreApplication::processEvents(QEventLoop::AllEvents,10);if(f())return true;QThread::msleep(1);}return f();
 }
+void interruptionTests(){
+    for(int mode=0;mode<3;mode++){
+        EditorBridge bridge("interruption-build");QString error;KindRule rule;
+        rule.createPermission="create";rule.deletePermission="delete";
+        rule.fields["name"]={"rename",State::shortString,false};
+        bridge.transport().authority().registerKind("object",rule);
+        require(bridge.transport().host(QHostAddress::LocalHost,0,error),"interruption host starts");
+        require(bridge.adoptHostState(error),"host mirror adopted");
+        require(!bridge.editable(),"missing project adapter never enables editing");
+        bool entered=false,nestedOk=false;
+        if(mode!=0)bridge.applyProject=[&](const QJsonObject&,QString&){
+            entered=true;QString nested;
+            nestedOk=!bridge.editable()&&bridge.drain(false,nested)==0&&!bridge.adoptHostState(nested);
+            if(mode==1){bridge.stop();return true;}
+            throw std::runtime_error("Injected project codec exception");
+        };
+        QJsonObject op{{"op","create"},{"entity","body"},{"kind","object"},{"expected","0"},{"fields",QJsonObject{{"name","Pending"}}}};
+        require(bridge.transport().hostTransaction({{"request","create"},{"ops",QJsonArray{op}}}).accepted,"interruption commit accepted");
+        bridge.drain(false,error);
+        require(!bridge.transport().connected()&&!bridge.editable(),"missing/interrupted/throwing codec closes transport");
+        require(!bridge.canonical().ready()&&!error.isEmpty(),"cancelled callback cannot resurrect canonical state");
+        require(mode==0||entered,"installed codec invoked");
+        require(mode==0||nestedOk,"project callback is frozen and cannot drain or reseed recursively");
+    }
+}
 void tests(){
     Session host("bridge-build");KindRule rule;
     rule.createPermission="create";rule.deletePermission="delete";
@@ -42,7 +67,7 @@ void tests(){
     require(host.hostTransaction({{"request","reject"},{"ops",QJsonArray{op}}}).accepted,"third host revision");
     require(waitFor([&]{bridge.drain(false,error);return !bridge.transport().connected();}),"codec failure closes session safely");
     require(applied==2&&!bridge.editable()&&!error.isEmpty(),"failed project apply never enables further edits");
-    bridge.stop();host.close();
+    bridge.stop();host.close();interruptionTests();
 }
 }
 int main(int argc,char** argv){
