@@ -1,5 +1,6 @@
 #include "LanSession.hpp"
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -17,6 +18,7 @@
 #include <QTimer>
 #include <QUuid>
 #include <algorithm>
+#include <cmath>
 #include <limits>
 namespace VoidframeLan {
 namespace {
@@ -82,8 +84,6 @@ struct Session::Impl {
     QJsonObject memberList;
     bool isHost=false,joining=false;
     qint64 lastPresence=-1000;
-    quint64 lastBroadcastRevision=0;
-    QHash<QString,qint64> lastSnapshotRequest;
     Impl(Session* o,const QString& compatibility):owner(o),build(compatibility),server(o),timer(o) {
         clock.start();
         QObject::connect(&server,&QTcpServer::newConnection,o,[this]{accept();});
@@ -93,12 +93,12 @@ struct Session::Impl {
     void status(const QString& text) {if(owner->onStatus)owner->onStatus(text);}
     void event(const QJsonObject& e) {if(owner->onEvent)owner->onEvent(e);}
     QByteArray proof(const Peer& p,const QByteArray& label) const {
-        return mac(secret,label+'\\0'+p.nonce+'\\0'+p.id.toUtf8()+'\\0'+build.toUtf8());
+        return mac(secret,label+'\0'+p.nonce+'\0'+p.id.toUtf8()+'\0'+build.toUtf8());
     }
     void cleanup(QTcpSocket* socket) {
         auto p=peers.take(socket);if(!p)return;
         state.disconnected(p->id);lastSnapshotRequest.remove(p->id);socket->deleteLater();
-        if(isHost)sendMembers();else {joining=false;id.clear();memberList=QJsonObject();status("Disconnected; discard uncommitted speculative edits");}
+        if(isHost)sendMembers();else {joining=false;id.clear();memberList=QJsonObject();status("Disconnected; local uncommitted edits must not be treated as host state");}
         event({{"type","left"},{"peer",p->id}});
     }
     void drop(Peer& p,const QString& reason) {
@@ -108,8 +108,8 @@ struct Session::Impl {
     void flush(Peer& p) {
         if(!p.socket)return;
         while(!p.output.isEmpty()&&p.socket->bytesToWrite()<256*1024) {
-            const QByteArray f=p.output.dequeue();p.queued-=f.size();
-            if(p.socket->write(f)!=f.size()) {drop(p,"Socket write failed");return;}
+            const QByteArray frame=p.output.dequeue();p.queued-=frame.size();
+            if(p.socket->write(frame)!=frame.size()) {drop(p,"Socket write failed");return;}
         }
     }
     bool frame(Peer& p,const QJsonObject& message,bool signedFrame) {
@@ -121,7 +121,7 @@ struct Session::Impl {
             const QByteArray sequence=QByteArray::number(++p.sent);
             const QByteArray direction=isHost?"S":"C";
             wrapped={{"seq",QString::fromLatin1(sequence)},{"payload",QString::fromLatin1(payload.toBase64())},
-                     {"mac",QString::fromLatin1(mac(p.key,direction+sequence+'\\0'+payload).toHex())}};
+                     {"mac",QString::fromLatin1(mac(p.key,direction+sequence+'\0'+payload).toHex())}};
         }
         const QByteArray bytes=QJsonDocument(wrapped).toJson(QJsonDocument::Compact);
         if(bytes.size()>MaxFrame||p.queued+(p.socket?p.socket->bytesToWrite():0)+bytes.size()>MaxQueued) {drop(p,"Slow peer exceeded output budget");return false;}
@@ -135,7 +135,7 @@ struct Session::Impl {
         return false;
     }
     void broadcast(const QJsonObject& o) {
-        const auto values=peers.values();for(const auto& p:values)if(p->ready)frame(p,o,true);
+        const auto values=peers.values();for(const auto& p:values)if(p->ready)frame(*p,o,true);
     }
     void sendMembers() {
         QJsonObject m;
@@ -143,31 +143,31 @@ struct Session::Impl {
         for(const auto& p:peers)if(p->ready)m[p->id]=QJsonObject{{"name",p->name},{"color",int(qHash(p->id)%8)}};
         memberList=m;broadcast({{"type","members"},{"members",m}});event({{"type","members"},{"members",m}});
     }
-    void wire(QTcpSocket socket,const std::shared_ptr<Peer>& p) {
+    void wire(QTcpSocket* socket,const std::shared_ptr<Peer>& p) {
         p->socket=socket;p->born=p->lastRead=clock.elapsed();peers.insert(socket,p);
         socket->setReadBufferSize(MaxFrame+4);
-        QObject::connect(socket,&QTcpSocket::readyRead,owner,[this,socket]{auto p=peers.value(socket);if(p)read(p);});
-        QObject::connect(socket,&QTcpSocket::bytesWritten,owner,[this,socket](qint64){auto p=peers.value(socket);if(p)flush(p);});
+        QObject::connect(socket,&QTcpSocket::readyRead,owner,[this,socket]{auto p=peers.value(socket);if(p)read(*p);});
+        QObject::connect(socket,&QTcpSocket::bytesWritten,owner,[this,socket](qint64){auto p=peers.value(socket);if(p)flush(*p);});
         QObject::connect(socket,&QTcpSocket::disconnected,owner,[this,socket]{cleanup(socket);});
         QObject::connect(socket,&QAbstractSocket::errorOccurred,owner,[this,socket](QAbstractSocket::SocketError){
-            auto p=peers.value(socket);if(p)drop(p,socket->errorString());
+            auto p=peers.value(socket);if(p)drop(*p,socket->errorString());
         });
     }
     void accept() {
         while(server.hasPendingConnections()) {
-            auto s=server.nextPendingConnection();
+            auto* s=server.nextPendingConnection();
             if(peers.size()>=8) {s->abort();s->deleteLater();continue;}
             auto p=std::make_shared<Peer>();p->id=uid();p->nonce=randomBytes(32);wire(s,p);
-            frame(p,{{"type","challenge"},{"protocol",ProtocolVersion},{"build",build},{"id",p->id},{"nonce",QString::fromLatin1(p->nonce.toBase64())}},false);
+            frame(*p,{{"type","challenge"},{"protocol",ProtocolVersion},{"build",build},{"id",p->id},{"nonce",QString::fromLatin1(p->nonce.toBase64())}},false);
         }
     }
     void read(Peer& p) {
         while(p.socket&&p.socket->bytesAvailable()>0) {
             const int remaining=MaxFrame+4-p.input.size();if(remaining<=0){drop(p,"Input buffer overflow");return;}
-            const QByteArray b=p.socket->read(std::min(remaining,641024));if(b.isEmpty())break;
+            const QByteArray b=p.socket->read(std::min(remaining,64*1024));if(b.isEmpty())break;
             p.input+=b;
             while(p.input.size()>=4) {
-                const auto x=reinterpret_cast<const unsigned char>(p.input.constData());
+                const auto* x=reinterpret_cast<const unsigned char*>(p.input.constData());
                 const quint32 n=(quint32(x[0])<<24)|(quint32(x[1])<<16)|(quint32(x[2])<<8)|x[3];
                 if(!n||n>quint32(MaxFrame)){drop(p,"Invalid frame size");return;}
                 if(p.input.size()<int(n)+4)break;
@@ -184,7 +184,7 @@ struct Session::Impl {
                     const QString tagText=message.value("mac").toString();
                     if(!State::parseRevision(message.value("seq"),seq)||p.received==std::numeric_limits<quint64>::max()||seq!=p.received+1||body.isEmpty()||!validHash(tagText)) {drop(p,"Bad message sequence/envelope");return;}
                     const QByteArray direction=isHost?"C":"S";
-                    if(!equal(QByteArray::fromHex(tagText.toLatin1()),mac(p.key,direction+QByteArray::number(seq)+'\\0'+body))) {drop(p,"Message authentication failed");return;}
+                    if(!equal(QByteArray::fromHex(tagText.toLatin1()),mac(p.key,direction+QByteArray::number(seq)+'\0'+body))) {drop(p,"Message authentication failed");return;}
                     const auto doc=QJsonDocument::fromJson(body,&error);
                     if(error.error!=QJsonParseError::NoError||!doc.isObject()){drop(p,"Invalid signed payload");return;}
                     message=doc.object();p.received=seq;
@@ -203,7 +203,7 @@ struct Session::Impl {
                !equal(decode(m.value("proof").toString(),32),proof(p,"client"))) {drop(p,"Authentication/build check failed");return;}
             p.name=peerName.trimmed();p.key=proof(p,"session-key");
             frame(p,{{"type","authenticated"},{"proof",QString::fromLatin1(proof(p,"server").toBase64())}},false);
-            p.ready=true;state.setGrant(p.id,Grant());
+            p.ready=true;state.setGrant(p.id,Grant()); // read-only until HOST grants rights
             frame(p,{{"type","permissions"},{"permissions",grantJson(state.grant(p.id))}},true);
             sendMembers();sendSnapshot(p);event({{"type","joined"},{"peer",p.id},{"name",p.name}});
         } else if(type=="challenge"&&p.nonce.isEmpty()) {
@@ -243,6 +243,7 @@ struct Session::Impl {
     void commitEvent(const QString& actor,const Result& r) {
         if(!r.accepted)return;
         QJsonObject e{{"type","commit"},{"actor",actor},{"revision",QString::number(r.revision)},{"changes",r.changes}};
+        // A large delete can affect many fields; chunked snapshot is the fallback.
         if(QJsonDocument(e).toJson(QJsonDocument::Compact).size()>MaxPayload) {
             const auto values=peers.values();for(const auto& p:values)if(p->ready)sendSnapshot(*p);
             event({{"type","snapshot"},{"state",state.snapshot()}});
@@ -256,6 +257,8 @@ struct Session::Impl {
             if(!m.value("transaction").isObject()){drop(p,"Invalid transaction packet");return;}
             const auto t=m.value("transaction").toObject();const auto r=state.transact(p.id,t,clock.elapsed());
             frame(p,{{"type","result"},{"request",t.value("request")},{"accepted",r.accepted},{"error",r.error},{"revision",QString::number(r.revision)}},true);
+            // Idempotent retries return the cached result but must not emit the
+            // already-applied delta again (clients would see a revision gap).
             if(r.accepted&&r.revision==state.revision()&&r.revision>lastBroadcastRevision) {
                 lastBroadcastRevision=r.revision;commitEvent(p.id,r);
             }
@@ -273,8 +276,7 @@ struct Session::Impl {
         } else if(type=="presence") {
             const auto pose=m.value("pose").toObject();const qint64 now=clock.elapsed();
             if(!poseValid(pose)){drop(p,"Invalid camera pose");return;}
-            if(now-p.lastPose<50)return;
-            p.lastPose=now;
+            if(now-p.lastPose<50)return;p.lastPose=now;
             QJsonObject e{{"type","presence"},{"peer",p.id},{"pose",pose}};broadcast(e);event(e);
         } else if(type=="blob.put") {
             if(!state.allowed(p.id,"resources","resources.publish")){frame(p,{{"type","error"},{"error","Resource upload permission denied"}},true);return;}
@@ -285,6 +287,8 @@ struct Session::Impl {
             frame(p,{{"type","blob"},{"hash",hash},{"data",QString::fromLatin1(b.toBase64())}},true);
         } else {drop(p,"Unknown/client-forbidden operation");}
     }
+    quint64 lastBroadcastRevision=0;
+    QHash<QString,qint64> lastSnapshotRequest;
     void clientMessage(Peer& p,const QJsonObject& m) {
         const QString type=m.value("type").toString();
         if(type=="ping"){frame(p,{{"type","pong"}},true);return;}
@@ -319,12 +323,12 @@ struct Session::Impl {
         const qint64 now=clock.elapsed();const auto values=peers.values();
         for(const auto& p:values) {
             if((!p->ready&&now-p->born>10000)||(p->ready&&now-p->lastRead>30000)){drop(*p,"Peer timed out");continue;}
-            if(p->ready)frame(p,{{"type","ping"}},true);
+            if(p->ready)frame(*p,{{"type","ping"}},true);
         }
     }
 };
-Session::Session(const QString& build,QObject parent):QObject(parent),d(new Impl(this,build)){}
-Session::\~Session(){close();}
+Session::Session(const QString& build,QObject* parent):QObject(parent),d(new Impl(this,build)){}
+Session::~Session(){close();}
 State& Session::authority(){return d->state;}
 bool Session::host(const QHostAddress& address,quint16 port,QString& error){
     if(d->isHost||d->joining||!d->peers.isEmpty()){error="Close the current session first";return false;}
@@ -344,6 +348,7 @@ void Session::close(){
     d->isHost=false;d->joining=false;d->server.close();
     const auto values=d->peers.values();for(const auto& p:values)if(p->socket){QObject::disconnect(p->socket.data(),nullptr,this,nullptr);p->socket->abort();p->socket->deleteLater();}
     d->peers.clear();d->state.reset();
+    // Never make cached assets from an earlier project available to a later session.
     if(d->cache.isValid()) for(const QString& hash:QDir(d->cache.path()).entryList(QDir::Files))
         if(validHash(hash))QFile::remove(d->blockPath(hash));
     d->cacheBytes=0;d->cacheBlocks=0;d->lastPresence=-1000;
